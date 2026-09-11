@@ -362,9 +362,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--ouro); }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-/* ===========================================================================
-   MOTOR DE CALCULO — replica exata das formulas da planilha
-   =========================================================================== */
+/* ===== MOTOR DE CALCULO ===== */
 /* ============================================================
    FALA SINUCA — MOTOR DE CÁLCULO
    Réplica exata das fórmulas da planilha Fala_Sinuca_Ranking.xlsx
@@ -706,9 +704,7 @@ function streak(jogadorId, estado) {
 }
 
 
-/* ===========================================================================
-   APLICACAO
-   =========================================================================== */
+/* ===== APLICACAO ===== */
 /* ===========================================================================
    FALA SINUCA — aplicação
    =========================================================================== */
@@ -1101,29 +1097,41 @@ function viewLadder() {
 
     ${!minhaPos ? `<div class="aviso info"><div>Você está cadastrado como apostador, então não
       aparece no ladder — mas pode apostar normalmente na aba Desafios.</div></div>`
-      : meuDesafioAberto ? `<div class="aviso alerta"><div>Você já tem um desafio em aberto contra
+      : meuDesafioAberto ? `<div class="aviso alerta"><div>Você já tem um jogo marcado contra
       <b>${esc(nomeDe(meuDesafioAberto.desafiante_id === S.eu ? meuDesafioAberto.desafiado_id : meuDesafioAberto.desafiante_id))}</b>.
-      Resolva ele antes de lançar outro.</div></div>`
+      Resolva ele antes de marcar outro.</div></div>`
       : alvos.length ? `<div class="aviso bom"><div>Você é o <b>#${minhaPos.pos}</b> e pode desafiar
-      ${alvos.map(a => '<b>' + esc(nomeDe(a)) + '</b>').join(' ou ')}.</div></div>`
-      : `<div class="aviso info"><div>Você é o <b>#1</b>. Agora é só defender o topo.</div></div>`}
+      ${alvos.map(a => '<b>' + esc(nomeDe(a)) + '</b>').join(' ou ')}.
+      Com o resto do pessoal dá para marcar um <b>amistoso</b>.</div></div>`
+      : `<div class="aviso info"><div>Você é o <b>#1</b>: não tem ninguém acima para desafiar.
+      Agora é defender o topo — ou marcar um <b>amistoso</b> com quem você quiser.</div></div>`}
 
     <div class="tab-rolagem"><table>
       <thead><tr><th>#</th><th>Jogador</th><th class="num">Rating</th>
         <th class="esconde-mob">Forma</th><th class="num">Score</th><th></th></tr></thead>
       <tbody>${S.ladder.map(j => {
+        const souEu = j.id === S.eu;
         const podeDesafiar = alvos.includes(j.id) && !meuDesafioAberto;
-        return `<tr class="${j.id === S.eu ? 'destaque' : ''}">
+        const podeAmistoso = minhaPos && !souEu && !podeDesafiar && !meuDesafioAberto;
+        return `<tr class="${souEu ? 'destaque' : ''}">
           <td><span class="pos p${j.pos}">${j.pos}</span></td>
           <td>${celJogador(j, j.pos_manual ? '<span class="tag t-cinza">ajuste manual</span>' : '')}</td>
           <td class="num"><b>${j.rating}</b></td>
           <td class="esconde-mob">${formaHTML(j.id, 4)}</td>
           <td class="num">${pip(j)}</td>
           <td style="text-align:right">${podeDesafiar
-            ? `<button class="btn mini ok" data-desafiar="${esc(j.id)}">Desafiar</button>` : ''}</td>
+            ? `<button class="btn mini ok" data-desafiar="${esc(j.id)}">Desafiar</button>`
+            : podeAmistoso
+            ? `<button class="btn mini" data-amistoso="${esc(j.id)}">Amistoso</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>
+
+    <div class="aviso info" style="margin-top:14px"><div>
+      <b>Desafio</b> — só em quem está até 2 posições acima. Se você ganhar, assume o lugar dele.<br>
+      <b>Amistoso</b> — contra qualquer um, a qualquer hora. Vale rating e entra no ranking,
+      mas <b>não mexe nas posições do ladder</b>. Dá para apostar do mesmo jeito.
+    </div></div>
   </div>`;
 }
 
@@ -1154,11 +1162,15 @@ function viewDesafios() {
           : `<div style="font-size:11.5px;color:var(--texto-fraco)">${souJogador ? 'você joga esta' : '—'}</div>`}
       </div>`;
 
+    const ehAmistoso = d.tipo === 'amistoso';
     return `<div class="card">
       <div class="linha" style="justify-content:space-between;margin-bottom:12px">
-        <div><span class="tag t-ouro">Desafio aberto</span>
+        <div><span class="tag ${ehAmistoso ? 't-azul' : 't-ouro'}">
+            ${ehAmistoso ? 'Amistoso · não mexe no ladder' : 'Desafio · vale posição'}</span>
           <span style="color:var(--texto-fraco);font-size:12.5px;margin-left:7px">
-            #${S.ladder.find(x => x.id === B.id)?.pos ?? '?'} desafiou #${S.ladder.find(x => x.id === A.id)?.pos ?? '?'}
+            ${ehAmistoso
+              ? `#${S.ladder.find(x => x.id === B.id)?.pos ?? '?'} chamou #${S.ladder.find(x => x.id === A.id)?.pos ?? '?'}`
+              : `#${S.ladder.find(x => x.id === B.id)?.pos ?? '?'} desafiou #${S.ladder.find(x => x.id === A.id)?.pos ?? '?'}`}
             · ${dataBR(d.criado_em?.slice(0, 10))}</span></div>
         ${d.desafiante_id === S.eu && !total.length
           ? `<button class="btn mini perigo" data-cancelar="${esc(d.id)}">Cancelar</button>` : ''}
@@ -1182,8 +1194,9 @@ function viewDesafios() {
   return `
     <div class="card">
       <h2>Desafios</h2>
-      <p class="sub">O jogador lança o desafio no Ladder. Enquanto ele está aberto, todo mundo
-        pode apostar moedas. Quando o admin lança o resultado, o pagamento é automático.</p>
+      <p class="sub">O jogador marca o jogo no Ladder — <b>desafio</b> (vale posição) ou
+        <b>amistoso</b> (vale só rating). Enquanto está aberto, todo mundo pode apostar moedas.
+        Quando o admin lança o resultado, o pagamento é automático.</p>
       ${S.eu ? `<div class="linha"><div class="kpi" style="flex:1">
         <span>Seu saldo</span><b>🪙 ${nf(saldoAtual(S.eu))}</b></div></div>` : ''}
     </div>
@@ -1191,13 +1204,15 @@ function viewDesafios() {
       : `<div class="card">${vazio('🥊', 'Nenhum desafio aberto. Vá no Ladder e lance o seu.')}</div>`}
     ${encerrados.length ? `<div class="card"><h2>Encerrados</h2>
       <div class="tab-rolagem"><table>
-        <thead><tr><th>Confronto</th><th class="esconde-mob">Apostas</th><th>Situação</th></tr></thead>
+        <thead><tr><th>Confronto</th><th>Tipo</th><th class="esconde-mob">Apostas</th><th>Situação</th></tr></thead>
         <tbody>${encerrados.map(d => {
           const jogo = S.jogos.find(g => g.desafio_id === d.id);
           const n = S.apostas.filter(a => a.desafio_id === d.id).length;
           return `<tr>
             <td>${esc(nomeDe(d.desafiado_id))} <span style="color:var(--texto-fraco)">×</span>
                 ${esc(nomeDe(d.desafiante_id))}</td>
+            <td><span class="tag ${d.tipo === 'amistoso' ? 't-azul' : 't-ouro'}">
+                ${d.tipo === 'amistoso' ? 'amistoso' : 'desafio'}</span></td>
             <td class="esconde-mob">${n || '—'}</td>
             <td>${d.status === 'cancelado' ? '<span class="tag t-cinza">cancelado</span>'
               : jogo ? (jogo.vencedor_id ? `<span class="tag t-verde">${esc(nomeDe(jogo.vencedor_id))} venceu</span>`
@@ -1211,8 +1226,8 @@ function viewDesafios() {
 function viewJogos() {
   const det = [...S.estado.detalhes].reverse();
   const rotulo = {
-    normal: '', so_rating: '<span class="tag t-azul">só rating</span>',
-    amistoso: '<span class="tag t-cinza">amistoso</span>',
+    normal: '', so_rating: '<span class="tag t-azul">amistoso</span>',
+    amistoso: '<span class="tag t-cinza">não contou</span>',
     historico: '<span class="tag t-cinza">planilha</span>'
   };
   return `<div class="card">
@@ -1457,14 +1472,18 @@ function viewAdm() {
   </div>
 
   <div class="card">
-    <h2>Lançar resultado de desafio</h2>
-    <p class="sub">Ao salvar, o rating e o ladder se atualizam e as apostas são pagas na hora.</p>
-    ${abertos.length ? abertos.map(d => `
+    <h2>Lançar resultado</h2>
+    <p class="sub">Ao salvar, o rating e o ladder se atualizam e as apostas são pagas na hora. Amistoso já vem marcado como "vale só rating" — não precisa trocar.</p>
+    ${abertos.length ? abertos.map(d => {
+      const am = d.tipo === 'amistoso';
+      return `
       <div style="border:1px solid var(--borda);border-radius:11px;padding:13px;margin-bottom:11px">
         <div style="font-weight:700;margin-bottom:9px">
           ${esc(nomeDe(d.desafiado_id))} <span style="color:var(--texto-fraco)">(desafiado)</span>
           × ${esc(nomeDe(d.desafiante_id))} <span style="color:var(--texto-fraco)">(desafiante)</span>
-          <span class="tag t-cinza" style="margin-left:7px">
+          <span class="tag ${am ? 't-azul' : 't-ouro'}" style="margin-left:7px">
+            ${am ? 'amistoso' : 'desafio'}</span>
+          <span class="tag t-cinza">
             ${S.apostas.filter(a => a.desafio_id === d.id && a.status === 'aberta').length} aposta(s)</span>
         </div>
         <div class="linha">
@@ -1473,16 +1492,16 @@ function viewAdm() {
             <option value="${esc(d.desafiante_id)}">Venceu: ${esc(nomeDe(d.desafiante_id))}</option>
             <option value="">Empate</option>
           </select>
-          <select data-tipo="${esc(d.id)}" style="flex:1;min-width:150px">
-            <option value="normal">Vale posição + rating</option>
-            <option value="so_rating">Só rating</option>
-            <option value="amistoso">Amistoso (não conta)</option>
+          <select data-tipo="${esc(d.id)}" style="flex:1;min-width:170px">
+            <option value="normal" ${am ? '' : 'selected'}>Desafio — vale posição + rating</option>
+            <option value="so_rating" ${am ? 'selected' : ''}>Amistoso — vale só rating</option>
+            <option value="amistoso">Não conta nada (treino / dupla)</option>
           </select>
           <input type="date" data-data="${esc(d.id)}" value="${hojeISO()}" style="width:auto">
           <button class="btn p mini" data-salvar-res="${esc(d.id)}">Salvar</button>
         </div>
-      </div>`).join('')
-      : vazio('🥊', 'Nenhum desafio aberto no momento.')}
+      </div>`; }).join('')
+      : vazio('🥊', 'Nenhum jogo marcado no momento.')}
   </div>
 
   <div class="card">
@@ -1497,9 +1516,9 @@ function viewAdm() {
         <select id="av-venc"><option value="">Empate</option>${optJog()}</select></label>
       <label class="campo"><span>Tipo</span>
         <select id="av-tipo">
-          <option value="normal">Vale posição + rating</option>
-          <option value="so_rating">Só rating</option>
-          <option value="amistoso">Amistoso</option>
+          <option value="normal">Desafio — vale posição + rating</option>
+          <option value="so_rating">Amistoso — vale só rating</option>
+          <option value="amistoso">Não conta nada (treino / dupla)</option>
         </select></label>
       <label class="campo"><span>Data</span><input type="date" id="av-data" value="${hojeISO()}"></label>
     </div>
@@ -1610,7 +1629,9 @@ function viewAdm() {
 /* ------------------------------------------------------------ eventos */
 function ligarEventos(raiz) {
   raiz.querySelectorAll('[data-desafiar]').forEach(b =>
-    b.onclick = () => abrirDesafio(b.dataset.desafiar));
+    b.onclick = () => abrirDesafio(b.dataset.desafiar, 'desafio'));
+  raiz.querySelectorAll('[data-amistoso]').forEach(b =>
+    b.onclick = () => abrirDesafio(b.dataset.amistoso, 'amistoso'));
   raiz.querySelectorAll('[data-cancelar]').forEach(b =>
     b.onclick = () => cancelarDesafio(b.dataset.cancelar));
   raiz.querySelectorAll('[data-apostar]').forEach(b =>
@@ -1738,27 +1759,43 @@ function ligarEventos(raiz) {
 }
 
 /* ------------------------------------------------------------ ações */
-function abrirDesafio(alvoId) {
+function abrirDesafio(alvoId, tipo = 'desafio') {
   const alvo = jogDe(alvoId), eu = jogDe(S.eu);
-  const v = desafioValido(S.ladder, S.eu, alvoId);
-  if (!v.ok) return erro(v.motivo);
-  modal('Lançar desafio', `
+  const amistoso = tipo === 'amistoso';
+  if (!amistoso) {
+    const v = desafioValido(S.ladder, S.eu, alvoId);
+    if (!v.ok) return erro(v.motivo);
+  }
+  const minhaPos = S.ladder.find(x => x.id === S.eu)?.pos;
+  const posAlvo = S.ladder.find(x => x.id === alvoId)?.pos;
+
+  modal(amistoso ? 'Marcar amistoso' : 'Lançar desafio', `
     <p style="font-size:14.5px;line-height:1.6">
-      Você (<b>#${S.ladder.find(x => x.id === S.eu).pos} ${esc(eu.nome)}</b>) vai desafiar
-      <b>#${S.ladder.find(x => x.id === alvoId).pos} ${esc(alvo.nome)}</b>.</p>
-    <div class="aviso info"><div>Se você ganhar, assume a posição dele. Se perder, continua
-      onde está — mas o rating troca pontos do mesmo jeito.<br><br>
-      Enquanto o desafio estiver aberto, o pessoal pode apostar moedas em vocês dois.</div></div>
+      Você (<b>#${minhaPos} ${esc(eu.nome)}</b>) vai
+      ${amistoso ? 'jogar um amistoso contra' : 'desafiar'}
+      <b>#${posAlvo} ${esc(alvo.nome)}</b>.</p>
+    <div class="aviso ${amistoso ? 'info' : 'bom'}"><div>
+      ${amistoso
+        ? `O amistoso <b>vale rating</b> e entra no ranking, mas <b>ninguém muda de posição</b>
+           no ladder — ganhando ou perdendo.<br><br>
+           Serve para jogar com quem está fora do seu alcance, para revanche, ou só pelo rating.`
+        : `Se você ganhar, <b>assume a posição dele</b>. Se perder, continua onde está —
+           mas o rating troca pontos do mesmo jeito.`}
+      <br><br>Enquanto o jogo estiver marcado, o pessoal pode apostar moedas em vocês dois.
+    </div></div>
     <div class="linha" style="justify-content:flex-end">
       <button class="btn" data-x>Cancelar</button>
-      <button class="btn p" data-ok>Lançar desafio</button></div>`,
+      <button class="btn p" data-ok>${amistoso ? 'Marcar amistoso' : 'Lançar desafio'}</button></div>`,
     (f, fechar) => {
       f.querySelector('[data-x]').onclick = fechar;
       f.querySelector('[data-ok]').onclick = async e => {
-        e.target.disabled = true; e.target.textContent = 'Lançando…';
+        e.target.disabled = true; e.target.textContent = 'Marcando…';
         try {
-          await rpc('fs_criar_desafio', { p_desafiante: S.eu, p_desafiado: alvoId, p_obs: null });
-          fechar(); bom('Desafio lançado! Agora é esperar as apostas.');
+          await rpc('fs_criar_desafio',
+            { p_desafiante: S.eu, p_desafiado: alvoId, p_tipo: tipo, p_obs: null });
+          fechar();
+          bom(amistoso ? 'Amistoso marcado! Agora é esperar as apostas.'
+                       : 'Desafio lançado! Agora é esperar as apostas.');
           S.aba = 'desafios'; await recarregar();
         } catch (er) { erro(er.message); fechar(); }
       };

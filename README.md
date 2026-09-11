@@ -53,8 +53,9 @@ Toda vez que você atualizar o arquivo no GitHub, a Vercel republica sozinha.
 **O jogador**
 
 1. Abre o link e clica no próprio nome. Sem senha — o site lembra da escolha no aparelho dele.
-2. Vai em **Ladder** e clica em *Desafiar* em quem está até 2 posições acima.
-3. O desafio aparece para o grupo inteiro apostar moedas.
+2. Vai em **Ladder**. Em quem está até 2 posições acima aparece o botão **Desafiar**.
+   Em todo o resto do pessoal aparece **Amistoso**.
+3. O jogo marcado aparece para o grupo inteiro apostar moedas.
 4. Jogaram? Ele te avisa.
 
 **Você**
@@ -63,11 +64,23 @@ Toda vez que você atualizar o arquivo no GitHub, a Vercel republica sozinha.
 2. Aparece a aba **🔒 ADM**. Em *Lançar resultado de desafio*, escolhe quem venceu.
 3. Salvou: rating, ladder e ranking se atualizam e **as apostas são pagas na hora**.
 
-O tipo da partida é o mesmo da coluna VALE da planilha:
+### Desafio × Amistoso
 
-- **Vale posição + rating** — o desafio normal.
-- **Só rating** — troca pontos, mas ninguém muda de posição.
-- **Amistoso** — não conta nada (jogo em dupla, por exemplo).
+| | Desafio | Amistoso |
+|---|---|---|
+| Contra quem | só até 2 posições acima | qualquer um, a qualquer hora |
+| Vale rating | ✅ | ✅ |
+| Entra no ranking | ✅ | ✅ |
+| Muda a posição no ladder | ✅ quem ganha assume o lugar | ❌ ninguém sai do lugar |
+| Dá para apostar | ✅ | ✅ |
+
+O amistoso resolve o caso de quem não alcança ninguém: o #13 pode jogar com o #1, valendo
+rating e moedas, sem furar a fila do ladder. Quem está em #1 também usa, já que não tem
+ninguém acima para desafiar.
+
+Na hora de lançar o resultado, o amistoso **já vem marcado como "vale só rating"** — você
+não precisa trocar nada, e mesmo que troque sem querer, o banco não deixa ele mexer no
+ladder. Ainda existe uma terceira opção, **"Não conta nada"**, para treino ou jogo em dupla.
 
 ---
 
@@ -76,7 +89,7 @@ O tipo da partida é o mesmo da coluna VALE da planilha:
 | | Jogador | Você |
 |---|:--:|:--:|
 | Ver ranking, ladder, jogos e saldos | ✅ | ✅ |
-| Lançar o próprio desafio | ✅ | ✅ |
+| Lançar o próprio desafio ou amistoso | ✅ | ✅ |
 | Apostar as próprias moedas | ✅ | ✅ |
 | Lançar resultado de partida | ❌ | ✅ |
 | Criar ou tirar moedas | ❌ | ✅ |
@@ -93,8 +106,9 @@ rating, apagar jogo ou ler a auditoria recebe `permission denied` em todos os ca
 
 - **Ranking** — rating, V/E/D, pontos, forma dos últimos 5 jogos e o Fala Score.
   Embaixo, o ranking dos apostadores por lucro.
-- **Ladder** — a escada. Cada um só vê o botão *Desafiar* em quem está ao alcance.
-- **Desafios** — desafios abertos com as odds ao vivo, para apostar.
+- **Ladder** — a escada. *Desafiar* em quem está ao alcance, *Amistoso* em todo o resto.
+- **Desafios** — jogos marcados com as odds ao vivo, para apostar. Cada um vem etiquetado
+  como desafio ou amistoso.
 - **Jogos** — histórico completo com o Δ rating de cada partida, zebra e troca de posição.
 - **Carteira** — saldo, extrato e o Fala Score de apostador.
 - **Perfil** — Fala Score detalhado, evolução do rating, confrontos diretos (H2H).
@@ -115,7 +129,8 @@ rating, apagar jogo ou ler a auditoria recebe `permission denied` em todos os ca
 | acima de 350 | +35 | −100 | +100 | −100 |
 
 **Ladder** — desafia quem está até 2 posições acima. Ganhou, troca de lugar. Perdeu, fica
-onde está, mas o rating troca pontos do mesmo jeito.
+onde está, mas o rating troca pontos do mesmo jeito. Fora desse alcance, é amistoso: vale
+rating e ranking, mas ninguém muda de posição.
 
 **Odds** — `1 + 10^((rating do adversário − seu rating) / 540)`, igual à planilha.
 A odd fica **travada no momento em que a pessoa aposta**.
