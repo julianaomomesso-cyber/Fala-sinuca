@@ -7,14 +7,14 @@ São só 4 arquivos:
 
 | Arquivo | Para que serve |
 |---|---|
-| `index.html` | O site inteiro. É o único arquivo que vai para o GitHub/Vercel. |
+| `index.html` | O site inteiro, **já com suas chaves do Supabase dentro**. É o único arquivo que vai para o GitHub/Vercel. |
 | `1-banco.sql` | Cola no Supabase. Cria tudo e já carrega seus 13 jogadores e 34 partidas. |
 | `2-admin.sql` | Cola no Supabase. Libera você como administrador. |
 | `README.md` | Este aqui. |
 
 ---
 
-## Instalação — 15 minutos
+## Instalação — 10 minutos
 
 ### 1. Supabase
 
@@ -25,31 +25,20 @@ São só 4 arquivos:
    e marque **Auto Confirm User**.
 4. Abra o `2-admin.sql`, troque o e-mail de exemplo pelo seu, cole no SQL Editor e rode.
    Tem de responder `Admin liberado: Caio`.
-5. Menu **Project Settings → API**. Copie o **Project URL** e a chave **anon public**.
 
-### 2. Colar as duas chaves no site
+As chaves do seu projeto (`qbblrlclvccelpvuecih`) já estão dentro do `index.html`.
+Não precisa copiar nada em **Project Settings → API** — só se um dia você trocar de projeto.
 
-Abra o `index.html` em qualquer editor de texto. Nas primeiras linhas tem isto:
+A chave `anon` é pública de propósito: sozinha ela não abre nada, porque quem manda são as
+regras de segurança do `1-banco.sql`. Pode subir no GitHub sem medo. O que nunca vai para o
+repositório é a **senha do seu usuário admin**.
 
-```js
-window.FS_CONFIG = {
-  SUPABASE_URL:      'https://SEU-PROJETO.supabase.co',
-  SUPABASE_ANON_KEY: 'COLE-AQUI-A-SUA-ANON-KEY'
-};
-```
-
-Troque os dois valores pelos que você copiou. **É a única coisa que se edita no arquivo.**
-
-A chave `anon` é pública de propósito — sozinha ela não abre nada, porque quem manda são
-as regras de segurança do `1-banco.sql`. Pode subir no GitHub sem medo. O que nunca vai
-para o repositório é a **senha do seu usuário admin**.
-
-### 3. GitHub
+### 2. GitHub
 
 Crie um repositório novo, clique em **Add file → Upload files** e arraste o `index.html`.
 Pronto. (Se preferir o terminal: `git init`, `git add .`, `git commit`, `git push`.)
 
-### 4. Vercel
+### 3. Vercel
 
 1. Entre em [vercel.com](https://vercel.com) com a conta do GitHub.
 2. **Add New → Project** → escolha o repositório → **Deploy**. Não configure nada.
