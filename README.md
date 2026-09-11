@@ -56,13 +56,20 @@ Toda vez que você atualizar o arquivo no GitHub, a Vercel republica sozinha.
 2. Vai em **Ladder**. Em quem está até 2 posições acima aparece o botão **Desafiar**.
    Em todo o resto do pessoal aparece **Amistoso**.
 3. O jogo marcado aparece para o grupo inteiro apostar moedas.
-4. Jogaram? Ele te avisa.
+
+3. Terminou o jogo, **ele mesmo lança o vencedor** na aba Desafios: aparecem os botões
+   *Eu venci* · *Fulano venceu* · *Empate*. Só os dois que jogaram veem esses botões.
 
 **Você**
 
 1. Clica em **Entrar como administrador** e usa o e-mail e a senha do Supabase.
-2. Aparece a aba **🔒 ADM**. Em *Lançar resultado de desafio*, escolhe quem venceu.
+2. Aparece a aba **🔒 ADM**. Em *Lançar resultado*, escolhe quem venceu — útil quando
+   ninguém lançou, quando o jogo foi fora do app, ou para corrigir algo.
+   É também onde você ajusta os **cinturões** de cada um.
 3. Salvou: rating, ladder e ranking se atualizam e **as apostas são pagas na hora**.
+
+Em qualquer um dos dois caminhos fica registrado **quem lançou** — aparece no histórico da
+aba Jogos e na auditoria. Se o resultado sair errado, você apaga a partida pela ADM e as moedas voltam.
 
 ### Desafio × Amistoso
 
@@ -90,8 +97,11 @@ ladder. Ainda existe uma terceira opção, **"Não conta nada"**, para treino ou
 |---|:--:|:--:|
 | Ver ranking, ladder, jogos e saldos | ✅ | ✅ |
 | Lançar o próprio desafio ou amistoso | ✅ | ✅ |
+| Trocar a própria foto e o próprio emoji | ✅ | ✅ |
 | Apostar as próprias moedas | ✅ | ✅ |
-| Lançar resultado de partida | ❌ | ✅ |
+| Lançar o vencedor da **própria** partida | ✅ | ✅ |
+| Lançar o vencedor de partida dos outros | ❌ | ✅ |
+| Ajustar os cinturões | ❌ | ✅ |
 | Criar ou tirar moedas | ❌ | ✅ |
 | Cadastrar jogador, ajustar posição, apagar jogo | ❌ | ✅ |
 | Mudar configurações e ler a auditoria | ❌ | ✅ |
@@ -105,13 +115,14 @@ rating, apagar jogo ou ler a auditoria recebe `permission denied` em todos os ca
 ## As abas
 
 - **Ranking** — rating, V/E/D, pontos, forma dos últimos 5 jogos e o Fala Score.
-  Embaixo, o ranking dos apostadores por lucro.
+  No topo, a faixa dourada do **cinturão atual**. Embaixo, o ranking dos apostadores por lucro.
 - **Ladder** — a escada. *Desafiar* em quem está ao alcance, *Amistoso* em todo o resto.
-- **Desafios** — jogos marcados com as odds ao vivo, para apostar. Cada um vem etiquetado
-  como desafio ou amistoso.
-- **Jogos** — histórico completo com o Δ rating de cada partida, zebra e troca de posição.
+- **Jogos** — duas partes na mesma tela. Em cima, os **jogos marcados**: odds ao vivo,
+  botão de apostar, e os botões de lançar o vencedor para quem jogou. Embaixo, o
+  **histórico** completo com o Δ rating de cada partida, zebra e troca de posição.
 - **Carteira** — saldo, extrato e o Fala Score de apostador.
-- **Perfil** — Fala Score detalhado, evolução do rating, confrontos diretos (H2H).
+- **Perfil** — foto, cinturões conquistados, Fala Score detalhado, evolução do rating e
+  confrontos diretos (H2H). É aqui que cada um se personaliza.
 - **🔒 ADM** — só você. Tem também o botão de **baixar backup em JSON**.
 
 ---
@@ -140,6 +151,33 @@ A odd fica **travada no momento em que a pessoa aposta**.
 Rating e posição **não ficam salvos** no banco: são recalculados a partir do histórico
 toda vez. Por isso nunca dessincroniza — e corrigir uma partida antiga arruma sozinho
 tudo o que veio depois.
+
+---
+
+## Foto e emoji
+
+Cada um personaliza o próprio perfil: **Perfil → Personalizar**. Dá para escolher um emoji
+de uma grade (ou digitar qualquer um) e mandar uma **foto**. A foto aparece no lugar do
+emoji em tudo — tela de entrada, ranking, ladder, cards de jogo e perfil.
+
+A imagem é **cortada em quadrado e reduzida para 256px dentro do próprio celular** antes de
+subir, então fica em uns 20 KB e é guardada direto na tabela de jogadores. Você não precisa
+configurar Storage nenhum no Supabase, e não tem custo de armazenamento para se preocupar.
+
+---
+
+## O cinturão
+
+Quem está em **#1 do ladder é o dono do cinturão**. Isso aparece em três lugares:
+
+- Uma **faixa dourada** no topo do Ranking e do Ladder, com o nome do campeão atual.
+- A etiqueta **👑 cinturão** e a linha destacada em dourado na primeira posição do ladder.
+- No Perfil dele, o selo **👑 CINTURÃO ATUAL**.
+
+Do lado do nome de cada um aparece **🏆 ×N** — quantos cinturões a pessoa já teve na
+história do grupo. Esse número é seu: você lança na mão em **ADM → Jogadores → Cinturões**,
+e ele entra no ranking, no ladder e no perfil na hora. Ao cadastrar alguém novo dá para
+já informar quantos títulos ele tem.
 
 ---
 

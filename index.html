@@ -228,6 +228,41 @@ input:focus, select:focus, textarea:focus { border-color: var(--ouro); }
 }
 .mini-score .pip { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
 
+/* ---------- Cinturão ---------- */
+.cinturao {
+  display: flex; align-items: center; gap: 16px; margin: 16px 0;
+  background: linear-gradient(110deg, rgba(212,160,60,.20) 0%, rgba(212,160,60,.06) 48%, transparent 100%);
+  border: 1px solid rgba(212,160,60,.45); border-radius: var(--raio);
+  padding: 16px 20px; position: relative; overflow: hidden;
+}
+.cinturao::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(420px 130px at 8% 50%, rgba(240,198,117,.14), transparent 70%);
+  pointer-events: none;
+}
+.cint-ico {
+  font-size: 34px; line-height: 1; flex: 0 0 auto;
+  filter: drop-shadow(0 3px 10px rgba(212,160,60,.55));
+}
+.cint-txt { display: grid; gap: 1px; z-index: 1; }
+.cint-txt span {
+  font-size: 10px; font-weight: 800; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--ouro);
+}
+.cint-txt b { font-size: 23px; font-weight: 800; color: var(--ouro-claro); line-height: 1.2; }
+.cint-txt small { font-size: 12px; color: var(--texto-fraco); }
+.cint-voce {
+  margin-left: auto; z-index: 1; white-space: nowrap;
+  background: var(--ouro); color: #20160a; font-weight: 800; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; border-radius: 999px;
+}
+.cint {
+  color: var(--ouro-claro); font-weight: 700; letter-spacing: .2px;
+  white-space: nowrap; margin-left: 2px;
+}
+tr.linha-campea td { background: rgba(212,160,60,.08); }
+tr.linha-campea td:first-child { box-shadow: inset 3px 0 0 var(--ouro); }
+
 .kpi {
   background: var(--painel-alto); border: 1px solid var(--borda);
   border-radius: 11px; padding: 13px 15px;
@@ -316,7 +351,33 @@ input:focus, select:focus, textarea:focus { border-color: var(--ouro); }
   .aro { width: 92px; height: 92px; flex: 0 0 92px; }
   .aro svg { width: 92px; height: 92px; }
   .aro .valor b { font-size: 25px; }
+  .cinturao { padding: 13px 15px; gap: 12px; }
+  .cint-ico { font-size: 27px; }
+  .cint-txt b { font-size: 18px; }
+  .cint-voce { padding: 4px 9px; font-size: 10px; }
 }
+
+/* ---------- Avatar e personalização ---------- */
+.av {
+  border-radius: 50%; object-fit: cover; display: block; flex: 0 0 auto;
+  border: 1px solid var(--borda-forte); background: var(--painel-alto);
+}
+.jog .av { border-color: rgba(212,160,60,.3); }
+.cint-txt .av { display: inline-block; vertical-align: -6px; }
+.escolha .av { margin: 0 auto; }
+
+.emoji-grade {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px;
+  max-height: 168px; overflow-y: auto; padding: 2px;
+}
+.emoji-grade button {
+  background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 9px; padding: 6px 0; font-size: 19px; line-height: 1.2; transition: .12s;
+}
+.emoji-grade button:hover { border-color: var(--ouro); background: var(--painel-alto); }
+.emoji-grade button.on { border-color: var(--ouro); background: rgba(212,160,60,.18); }
+
+label.btn { display: inline-flex; align-items: center; cursor: pointer; }
 
 </style>
 </head>
@@ -840,7 +901,8 @@ function telaEntrada() {
   $('#lista-jogadores').innerHTML = lista.map(j => {
     const p = S.ladder.find(x => x.id === j.id);
     return `<button data-id="${esc(j.id)}">
-      <span class="e">${esc(j.emoji || '🎱')}</span>
+      ${j.foto_url ? `<img class="av" src="${esc(j.foto_url)}" alt="" style="width:46px;height:46px">`
+                   : `<span class="e">${esc(j.emoji || '🎱')}</span>`}
       <span class="n">${esc(j.nome)}</span>
       <span class="p">${p ? '#' + p.pos + ' · ' + p.rating : 'apostador'}</span>
     </button>`;
@@ -924,8 +986,8 @@ function loginAdmin() {
 
 /* ---------------------------------------------------------------- render */
 const ABAS = [
-  ['ranking', 'Ranking'], ['ladder', 'Ladder'], ['desafios', 'Desafios'],
-  ['jogos', 'Jogos'], ['carteira', 'Carteira'], ['perfil', 'Perfil']
+  ['ranking', 'Ranking'], ['ladder', 'Ladder'], ['jogos', 'Jogos'],
+  ['carteira', 'Carteira'], ['perfil', 'Perfil']
 ];
 
 function render() {
@@ -937,7 +999,7 @@ function render() {
 
   const fs = eu ? falaScoreJogador(eu.id, S.estado) : null;
   $('#caixa-eu').innerHTML = eu ? `
-    <span style="font-size:17px">${esc(eu.emoji || '🎱')}</span>
+    ${avatar(eu, 24)}
     <b>${esc(eu.nome)}</b>
     <span class="moedas">🪙 ${nf(saldoAtual(eu.id))}</span>
     ${fs ? `<span class="tag" style="background:${fs.faixa.cor}22;color:${fs.faixa.cor};
@@ -956,8 +1018,8 @@ function render() {
 
   const alvo = $('#conteudo');
   alvo.innerHTML = ({
-    ranking: viewRanking, ladder: viewLadder, desafios: viewDesafios,
-    jogos: viewJogos, carteira: viewCarteira, perfil: viewPerfil, adm: viewAdm
+    ranking: viewRanking, ladder: viewLadder, jogos: viewJogos,
+    carteira: viewCarteira, perfil: viewPerfil, adm: viewAdm
   }[S.aba] || viewRanking)();
   ligarEventos(alvo);
 }
@@ -969,9 +1031,17 @@ function pip(j) {
     <i class="pip" style="background:${fs.faixa.cor}"></i>${fs.score}</span>`;
 }
 
+/** Foto do jogador quando existe; senão o emoji dele. */
+function avatar(j, px = 26) {
+  if (j?.foto_url) {
+    return `<img class="av" src="${esc(j.foto_url)}" alt=""
+      style="width:${px}px;height:${px}px" loading="lazy">`;
+  }
+  return `<span class="em" style="font-size:${Math.round(px * 0.66)}px">${esc(j?.emoji || '🎱')}</span>`;
+}
+
 function celJogador(j, extra = '') {
-  return `<div class="jog"><span class="em">${esc(j.emoji || '🎱')}</span>
-    <b>${esc(j.nome)}</b>${extra}</div>`;
+  return `<div class="jog">${avatar(j, 26)}<b>${esc(j.nome)}</b>${extra}</div>`;
 }
 
 function formaHTML(id, n = 5) {
@@ -1015,12 +1085,39 @@ function sparkline(pontos) {
 
 const vazio = (ic, txt) => `<div class="vazio"><span class="ic">${ic}</span>${esc(txt)}</div>`;
 
+/** Quem está no #1 do ladder é o dono do cinturão. */
+const campeao = () => S.ladder[0] || null;
+
+/** 🏆 ×N — cinturões já conquistados (o admin lança na mão). */
+function cintHTML(j, tam = 13) {
+  const n = j?.cinturoes || 0;
+  if (!n) return '';
+  return `<span class="cint" style="font-size:${tam}px" title="${n} cinturão(ões) na história">🏆${n > 1 ? ' ×' + n : ''}</span>`;
+}
+
+/** Faixa grande do campeão atual. */
+function faixaCampeao() {
+  const c = campeao();
+  if (!c) return '';
+  const souEu = c.id === S.eu;
+  return `<div class="cinturao">
+    <div class="cint-ico">🏆</div>
+    <div class="cint-txt">
+      <span>Cinturão atual</span>
+      <b>${avatar(c, 26)} ${esc(c.nome)}</b>
+      <small>#1 do ladder · rating ${c.rating}${c.cinturoes ? ` · ${c.cinturoes}º título` : ''}</small>
+    </div>
+    ${souEu ? '<div class="cint-voce">é você</div>' : ''}
+  </div>`;
+}
+
 /* ------------------------------------------------------------ RANKING */
 function viewRanking() {
   const r = S.ranking;
   if (!r.length) return `<div class="card">${vazio('🎱', 'Nenhum jogador cadastrado ainda.')}</div>`;
   const lider = r[0];
   return `
+  ${faixaCampeao()}
   <div class="card">
     <h2>Ranking</h2>
     <p class="sub">Ordenado pelo rating. Vitória vale 3 pontos, empate 1.</p>
@@ -1040,8 +1137,8 @@ function viewRanking() {
         const st = streak(j.id, S.estado);
         return `<tr class="${j.id === S.eu ? 'destaque' : ''}">
           <td><span class="pos p${j.posRanking}">${j.posRanking}</span></td>
-          <td>${celJogador(j, st.n >= 3 ? `<span class="tag ${st.tipo === 'V' ? 't-verde' : 't-vermelho'}">
-              ${st.n}${st.tipo}</span>` : '')}</td>
+          <td>${celJogador(j, cintHTML(j) + (st.n >= 3 ? `<span class="tag ${st.tipo === 'V' ? 't-verde' : 't-vermelho'}">
+              ${st.n}${st.tipo}</span>` : ''))}</td>
           <td class="num"><b>${j.rating}</b></td>
           <td class="num esconde-mob">${j.jogos}</td>
           <td class="num esconde-mob" style="color:var(--verde)">${j.v}</td>
@@ -1091,6 +1188,7 @@ function viewLadder() {
     d.status === 'aberto' && (d.desafiante_id === S.eu || d.desafiado_id === S.eu));
 
   return `
+  ${faixaCampeao()}
   <div class="card">
     <h2>Ladder</h2>
     <p class="sub">Você desafia quem está até <b>2 posições acima</b>. Se ganhar, assume o lugar dele.</p>
@@ -1113,9 +1211,10 @@ function viewLadder() {
         const souEu = j.id === S.eu;
         const podeDesafiar = alvos.includes(j.id) && !meuDesafioAberto;
         const podeAmistoso = minhaPos && !souEu && !podeDesafiar && !meuDesafioAberto;
-        return `<tr class="${souEu ? 'destaque' : ''}">
+        return `<tr class="${souEu ? 'destaque' : ''}${j.pos === 1 ? ' linha-campea' : ''}">
           <td><span class="pos p${j.pos}">${j.pos}</span></td>
-          <td>${celJogador(j, j.pos_manual ? '<span class="tag t-cinza">ajuste manual</span>' : '')}</td>
+          <td>${celJogador(j, (j.pos === 1 ? '<span class="tag t-ouro">👑 cinturão</span>' : '')
+              + cintHTML(j) + (j.pos_manual ? '<span class="tag t-cinza">ajuste manual</span>' : ''))}</td>
           <td class="num"><b>${j.rating}</b></td>
           <td class="esconde-mob">${formaHTML(j.id, 4)}</td>
           <td class="num">${pip(j)}</td>
@@ -1135,8 +1234,11 @@ function viewLadder() {
   </div>`;
 }
 
-/* ------------------------------------------------------------ DESAFIOS */
-function viewDesafios() {
+/* ------------------------------------------------------------ JOGOS
+   Uma aba só: em cima o que está marcado (para apostar e lançar resultado),
+   embaixo o histórico completo de partidas.
+   ------------------------------------------------------------ */
+function secaoMarcados() {
   const abertos = S.desafios.filter(d => d.status === 'aberto');
   const permitePropria = cfg('aposta_propria', false);
 
@@ -1153,7 +1255,7 @@ function viewDesafios() {
     const lado = (j, odd, outro) => `
       <div style="flex:1;min-width:150px;background:var(--painel-alto);border:1px solid var(--borda);
                   border-radius:11px;padding:13px;text-align:center">
-        <div style="font-size:26px">${esc(j.emoji || '🎱')}</div>
+        <div style="display:grid;place-items:center;margin-bottom:4px">${avatar(j, 44)}</div>
         <div style="font-weight:700;margin:3px 0">${esc(j.nome)}</div>
         <div style="font-size:12px;color:var(--texto-fraco)">rating ${S.estado.rating[j.id]}</div>
         <div style="font-size:23px;font-weight:800;color:var(--ouro-claro);margin:7px 0">${odd.toFixed(2)}×</div>
@@ -1180,6 +1282,15 @@ function viewDesafios() {
         <div style="display:grid;place-items:center;color:var(--texto-fraco);font-weight:800;padding:0 3px">×</div>
         ${lado(B, oddB)}
       </div>
+      ${souJogador ? `<div style="margin-top:13px;border-top:1px solid var(--borda);padding-top:13px">
+        <div style="font-size:12.5px;color:var(--texto-fraco);margin-bottom:8px">
+          Você joga esta. Quando terminar, lance o resultado aqui:</div>
+        <div class="linha">
+          <button class="btn ok mini" data-venceu="${esc(d.id)}" data-quem="${esc(S.eu)}">Eu venci</button>
+          <button class="btn mini" data-venceu="${esc(d.id)}" data-quem="${esc(A.id === S.eu ? B.id : A.id)}">
+            ${esc(A.id === S.eu ? B.nome : A.nome)} venceu</button>
+          <button class="btn mini" data-venceu="${esc(d.id)}" data-quem="">Empate</button>
+        </div></div>` : ''}
       ${minhas.length ? `<div class="aviso bom" style="margin-top:12px"><div>
         Sua aposta: ${minhas.map(a => `<b>${nf(a.moedas)} 🪙 em ${esc(nomeDe(a.em_id))} @ ${a.odd}×</b>`).join(', ')}
         — retorno de ${nf(minhas.reduce((t, a) => t + Math.round(a.moedas * a.odd), 0))} 🪙 se der certo.
@@ -1193,16 +1304,17 @@ function viewDesafios() {
 
   return `
     <div class="card">
-      <h2>Desafios</h2>
+      <h2>Jogos marcados</h2>
       <p class="sub">O jogador marca o jogo no Ladder — <b>desafio</b> (vale posição) ou
         <b>amistoso</b> (vale só rating). Enquanto está aberto, todo mundo pode apostar moedas.
-        Quando o admin lança o resultado, o pagamento é automático.</p>
+        Terminou o jogo, <b>quem jogou</b> (ou o admin) lança o vencedor e o pagamento das
+        apostas é automático.</p>
       ${S.eu ? `<div class="linha"><div class="kpi" style="flex:1">
         <span>Seu saldo</span><b>🪙 ${nf(saldoAtual(S.eu))}</b></div></div>` : ''}
     </div>
     ${abertos.length ? abertos.map(cartao).join('')
-      : `<div class="card">${vazio('🥊', 'Nenhum desafio aberto. Vá no Ladder e lance o seu.')}</div>`}
-    ${encerrados.length ? `<div class="card"><h2>Encerrados</h2>
+      : `<div class="card">${vazio('🥊', 'Nenhum jogo marcado. Vá no Ladder e marque o seu.')}</div>`}
+    ${encerrados.length ? `<div class="card"><h2>Marcados recentemente</h2>
       <div class="tab-rolagem"><table>
         <thead><tr><th>Confronto</th><th>Tipo</th><th class="esconde-mob">Apostas</th><th>Situação</th></tr></thead>
         <tbody>${encerrados.map(d => {
@@ -1222,8 +1334,11 @@ function viewDesafios() {
         }).join('')}</tbody></table></div></div>` : ''}`;
 }
 
-/* ------------------------------------------------------------ JOGOS */
 function viewJogos() {
+  return secaoMarcados() + secaoHistorico();
+}
+
+function secaoHistorico() {
   const det = [...S.estado.detalhes].reverse();
   const rotulo = {
     normal: '', so_rating: '<span class="tag t-azul">amistoso</span>',
@@ -1231,9 +1346,9 @@ function viewJogos() {
     historico: '<span class="tag t-cinza">planilha</span>'
   };
   return `<div class="card">
-    <h2>Todas as partidas</h2>
-    <p class="sub">${det.length} partidas registradas. A primeira coluna é sempre o desafiado
-      (quem estava em cima).</p>
+    <h2>Histórico de partidas</h2>
+    <p class="sub">${det.length} partidas já jogadas. A primeira coluna é sempre o desafiado
+      (quem estava em cima no ladder).</p>
     ${det.length ? `<div class="tab-rolagem"><table>
       <thead><tr><th>Data</th><th>Desafiado</th><th>Desafiante</th><th>Vencedor</th>
         <th class="num esconde-mob">Δ rating</th><th></th></tr></thead>
@@ -1251,6 +1366,7 @@ function viewJogos() {
                <span style="color:${g.delta_chal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${g.delta_chal > 0 ? '+' : ''}${g.delta_chal}</span>`
             : '<span style="color:var(--texto-fraco)">—</span>'}</td>
         <td>${rotulo[g.tipo] || ''}${g.trocou ? '<span class="tag t-ouro">trocou posição</span>' : ''}
+          ${g.lancado_por ? `<span class="tag t-cinza">lançado por ${esc(nomeDe(g.lancado_por))}</span>` : ''}
           ${S.admin ? `<button class="btn mini perigo" data-apagar-jogo="${esc(g.id)}"
             style="margin-left:6px">apagar</button>` : ''}</td>
       </tr>`).join('')}</tbody></table></div>` : vazio('📋', 'Nenhuma partida ainda.')}
@@ -1354,10 +1470,13 @@ function viewPerfil() {
   <div class="card">
     <div class="linha" style="justify-content:space-between">
       <h2 style="margin:0">Perfil</h2>
+      <div class="linha">
+      ${alvoId === S.eu ? '<button class="btn mini p" id="btn-personalizar">Personalizar</button>' : ''}
       <select id="sel-perfil" style="width:auto;min-width:170px">
         ${S.jogadores.filter(x => x.ativo).map(x =>
-          `<option value="${esc(x.id)}" ${x.id === j.id ? 'selected' : ''}>${esc(x.emoji || '')} ${esc(x.nome)}</option>`).join('')}
+          `<option value="${esc(x.id)}" ${x.id === j.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}
       </select>
+      </div>
     </div>
   </div>
 
@@ -1365,7 +1484,9 @@ function viewPerfil() {
     <div class="score-caixa">
       ${aro(fs.score, fs.faixa.cor)}
       <div style="flex:1;min-width:240px">
-        <div style="font-size:25px;font-weight:800">${esc(j.emoji || '🎱')} ${esc(j.nome)}</div>
+        <div style="font-size:25px;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${avatar(j, 46)} ${esc(j.nome)} ${cintHTML(j, 20)}</div>
+        ${campeao()?.id === j.id ? '<div class="tag t-ouro" style="margin:5px 0">👑 CINTURÃO ATUAL</div>' : ''}
         <div style="font-size:16px;font-weight:700;color:${fs.faixa.cor};margin:2px 0 12px">${esc(fs.faixa.nome)}</div>
         ${componentes(fs.componentes)}
         ${fs.confianca < 1 ? `<p style="font-size:12.5px;color:var(--texto-fraco);margin:8px 0 0">
@@ -1382,6 +1503,7 @@ function viewPerfil() {
       <div class="kpi"><span>Vitórias</span><b style="color:var(--verde)">${st.v}</b></div>
       <div class="kpi"><span>Derrotas</span><b style="color:var(--vermelho)">${st.d}</b></div>
       <div class="kpi"><span>Zebras dadas</span><b style="color:var(--ouro-claro)">${st.zebras}</b></div>
+      <div class="kpi"><span>Cinturões</span><b style="color:var(--ouro)">🏆 ${j.cinturoes || 0}</b></div>
     </div>
     ${sq.n >= 2 ? `<div class="aviso ${sq.tipo === 'V' ? 'bom' : sq.tipo === 'D' ? 'erro' : 'info'}" style="margin-top:14px">
       <div>Sequência atual: <b>${sq.n} ${sq.tipo === 'V' ? 'vitória(s)' : sq.tipo === 'D' ? 'derrota(s)' : 'empate(s)'} seguida(s)</b>.</div></div>` : ''}
@@ -1546,7 +1668,7 @@ function viewAdm() {
         <h3>Saldos atuais</h3>
         <div class="tab-rolagem"><table><tbody>
           ${S.jogadores.filter(j => j.ativo).map(j => `<tr>
-            <td>${esc(j.emoji || '')} ${esc(j.nome)}</td>
+            <td>${celJogador(j)}</td>
             <td class="num" style="color:var(--ouro-claro)">🪙 ${nf(saldoAtual(j.id))}</td></tr>`).join('')}
         </tbody></table></div>
       </div>
@@ -1564,27 +1686,33 @@ function viewAdm() {
           <select id="nj-joga"><option value="1">Sim — joga e aposta</option>
             <option value="0">Não — só aposta</option></select></label>
         <label class="campo"><span>Moedas iniciais</span><input type="number" id="nj-moedas" value="1000" step="100"></label>
+        <label class="campo"><span>🏆 Cinturões que ele já teve</span><input type="number" id="nj-cint" value="0" min="0"></label>
         <button class="btn p" id="btn-nj">Cadastrar</button>
       </div>
       <div>
         <h3>Ajustes</h3>
         <div class="tab-rolagem"><table>
-          <thead><tr><th>Jogador</th><th class="num">Pos.</th><th>Ajuste manual</th><th></th></tr></thead>
+          <thead><tr><th>Jogador</th><th class="num">Pos.</th><th>Ajuste manual</th>
+            <th>🏆 Cinturões</th><th></th></tr></thead>
           <tbody>${S.jogadores.map(j => {
             const l = S.ladder.find(x => x.id === j.id);
             return `<tr>
-              <td>${esc(j.emoji || '')} ${esc(j.nome)}${j.joga === false
+              <td>${celJogador(j)}${j.joga === false
                 ? ' <span class="tag t-cinza">apostador</span>' : ''}${!j.ativo
                 ? ' <span class="tag t-vermelho">inativo</span>' : ''}</td>
               <td class="num">${l ? l.pos : '—'}</td>
               <td><input type="number" min="1" data-posman="${esc(j.id)}"
-                   value="${j.pos_manual ?? ''}" placeholder="auto" style="width:78px"></td>
+                   value="${j.pos_manual ?? ''}" placeholder="auto" style="width:74px"></td>
+              <td><input type="number" min="0" data-cint="${esc(j.id)}"
+                   value="${j.cinturoes || 0}" style="width:68px"></td>
               <td style="text-align:right"><button class="btn mini" data-toggle-ativo="${esc(j.id)}">
                 ${j.ativo ? 'desativar' : 'reativar'}</button></td>
             </tr>`;
           }).join('')}</tbody></table></div>
         <p style="font-size:12.5px;color:var(--texto-fraco);margin-top:9px">
-          Deixe o ajuste vazio para a posição voltar a ser calculada sozinha pelos resultados.</p>
+          Deixe o ajuste de posição vazio para ela voltar a ser calculada sozinha pelos resultados.<br>
+          <b>Cinturões</b> é o histórico de títulos do grupo — você lança na mão e aparece
+          ao lado do nome no ranking e no perfil.</p>
       </div>
     </div>
   </div>
@@ -1638,9 +1766,12 @@ function ligarEventos(raiz) {
     b.onclick = () => abrirAposta(b.dataset.apostar, b.dataset.em, Number(b.dataset.odd)));
   raiz.querySelectorAll('[data-apagar-jogo]').forEach(b =>
     b.onclick = () => apagarJogo(b.dataset.apagarJogo));
+  raiz.querySelectorAll('[data-venceu]').forEach(b =>
+    b.onclick = () => lancarVencedor(b.dataset.venceu, b.dataset.quem || null));
 
   const sel = raiz.querySelector('#sel-perfil');
   if (sel) sel.onchange = () => { S.perfilId = sel.value; render(); };
+  raiz.querySelector('#btn-personalizar')?.addEventListener('click', abrirPersonalizar);
 
   if (!S.admin) return;
 
@@ -1713,7 +1844,8 @@ function ligarEventos(raiz) {
       const joga = raiz.querySelector('#nj-joga').value === '1';
       const { data, error } = await sb.from('jogadores').insert({
         nome, emoji: raiz.querySelector('#nj-emoji').value || '🎱',
-        joga, pos_inicial: joga ? S.ladder.length + 1 : 999, rating_inicial: 1000
+        joga, pos_inicial: joga ? S.ladder.length + 1 : 999, rating_inicial: 1000,
+        cinturoes: Math.max(0, Number(raiz.querySelector('#nj-cint').value) || 0)
       }).select().single();
       if (error) throw new Error(error.message);
       const m = Number(raiz.querySelector('#nj-moedas').value);
@@ -1723,6 +1855,14 @@ function ligarEventos(raiz) {
       erro(er.message.includes('duplicate') ? 'Já existe um jogador com esse nome.' : er.message);
       e.target.disabled = false;
     }
+  });
+
+  raiz.querySelectorAll('[data-cint]').forEach(inp => inp.onchange = async () => {
+    const v = Math.max(0, Number(inp.value) || 0);
+    const { error } = await sb.from('jogadores').update({ cinturoes: v }).eq('id', inp.dataset.cint);
+    if (error) return erro(error.message);
+    bom(`${nomeDe(inp.dataset.cint)}: ${v} cinturão(ões).`);
+    await recarregar();
   });
 
   raiz.querySelectorAll('[data-posman]').forEach(inp => inp.onchange = async () => {
@@ -1796,7 +1936,7 @@ function abrirDesafio(alvoId, tipo = 'desafio') {
           fechar();
           bom(amistoso ? 'Amistoso marcado! Agora é esperar as apostas.'
                        : 'Desafio lançado! Agora é esperar as apostas.');
-          S.aba = 'desafios'; await recarregar();
+          S.aba = 'jogos'; await recarregar();
         } catch (er) { erro(er.message); fechar(); }
       };
     });
@@ -1858,6 +1998,150 @@ function abrirAposta(desafioId, emId, odd) {
           fechar(); bom(`Aposta de ${nf(v)} 🪙 registrada @ ${odd.toFixed(2)}×`);
           await recarregar();
         } catch (er) { erro(er.message); e.target.disabled = false; e.target.textContent = 'Confirmar aposta'; }
+      };
+    });
+}
+
+/** O próprio jogador lança quem venceu a partida dele. */
+function lancarVencedor(desafioId, vencedorId) {
+  const d = S.desafios.find(x => x.id === desafioId);
+  if (!d) return;
+  const outro = d.desafiado_id === S.eu ? d.desafiante_id : d.desafiado_id;
+  const apostas = S.apostas.filter(a => a.desafio_id === desafioId && a.status === 'aberta');
+  const texto = vencedorId === null ? 'Empate'
+    : vencedorId === S.eu ? 'Você venceu' : `${nomeDe(outro)} venceu`;
+
+  modal('Confirmar resultado', `
+    <p style="font-size:15px;line-height:1.6">
+      <b>${esc(nomeDe(d.desafiado_id))}</b> × <b>${esc(nomeDe(d.desafiante_id))}</b><br>
+      Resultado: <b style="color:var(--ouro-claro);font-size:17px">${esc(texto)}</b></p>
+    <div class="aviso alerta"><div>
+      Assim que salvar, o rating${d.tipo === 'amistoso' ? '' : ' e o ladder'} se atualiza${d.tipo === 'amistoso' ? '' : 'm'}
+      ${apostas.length ? `e as <b>${apostas.length} aposta(s)</b> na mesa são pagas` : ''}.
+      Fica registrado que foi você quem lançou.<br><br>
+      Errou? O admin consegue apagar a partida e devolver as moedas.
+    </div></div>
+    <div class="linha" style="justify-content:flex-end">
+      <button class="btn" data-x>Voltar</button>
+      <button class="btn p" data-ok>Confirmar</button></div>`,
+    (f, fechar) => {
+      f.querySelector('[data-x]').onclick = fechar;
+      f.querySelector('[data-ok]').onclick = async e => {
+        e.target.disabled = true; e.target.textContent = 'Salvando…';
+        try {
+          await rpc('fs_lancar_vencedor',
+            { p_desafio: desafioId, p_jogador: S.eu, p_vencedor: vencedorId });
+          fechar(); bom('Resultado lançado!'); await recarregar();
+        } catch (er) { erro(er.message); e.target.disabled = false; e.target.textContent = 'Confirmar'; }
+      };
+    });
+}
+
+/* ------------------------------------------------------------ perfil */
+const EMOJIS = ['🎱','🎯','🦈','⚡','💣','🐺','🌵','🦅','🥔','🦖','🐦','🎩','🐂','🐢','🔥','👑',
+  '🐉','🦁','🐻','🐸','🦊','🐼','🦂','🍀','💎','🚀','🌪️','🥊','🃏','☠️','🤡','👽'];
+
+/** Reduz a imagem no próprio navegador antes de subir: 256px, JPEG. */
+function prepararFoto(file) {
+  return new Promise((ok, falha) => {
+    if (!file.type.startsWith('image/')) return falha(new Error('Escolha um arquivo de imagem.'));
+    if (file.size > 12 * 1024 * 1024) return falha(new Error('Imagem muito grande (máx. 12 MB).'));
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const L = 256;
+      const lado = Math.min(img.width, img.height);          // recorta quadrado do centro
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = L;
+      const cx = cv.getContext('2d');
+      cx.imageSmoothingQuality = 'high';
+      cx.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, L, L);
+      let q = 0.82, out = cv.toDataURL('image/jpeg', q);
+      while (out.length > 180000 && q > 0.4) { q -= 0.1; out = cv.toDataURL('image/jpeg', q); }
+      ok(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); falha(new Error('Não consegui abrir essa imagem.')); };
+    img.src = url;
+  });
+}
+
+function abrirPersonalizar() {
+  const j = jogDe(S.eu);
+  if (!j) return erro('Escolha seu nome primeiro.');
+  let novaFoto = null;          // null = não mexeu | '' = remover | data URL = trocar
+  let novoEmoji = j.emoji || '🎱';
+
+  modal('Personalizar meu perfil', `
+    <div style="text-align:center;margin-bottom:16px">
+      <div id="pv-av" style="display:inline-grid;place-items:center"></div>
+      <div style="font-weight:700;margin-top:8px;font-size:16px">${esc(j.nome)}</div>
+    </div>
+
+    <label class="campo"><span>Foto</span>
+      <div class="linha">
+        <label class="btn mini" style="margin:0">
+          Escolher foto<input type="file" id="pv-file" accept="image/*" hidden>
+        </label>
+        <button class="btn mini" id="pv-limpar" ${j.foto_url ? '' : 'disabled'}>Tirar a foto</button>
+      </div>
+    </label>
+    <p style="font-size:12px;color:var(--texto-fraco);margin:-6px 0 14px">
+      A imagem é cortada em quadrado e reduzida aqui no seu aparelho antes de subir.</p>
+
+    <label class="campo"><span>Emoji (aparece quando não tem foto)</span></label>
+    <div class="emoji-grade" id="pv-emojis">
+      ${EMOJIS.map(e => `<button type="button" data-e="${e}" class="${e === novoEmoji ? 'on' : ''}">${e}</button>`).join('')}
+    </div>
+    <label class="campo" style="margin-top:12px"><span>Ou digite o seu</span>
+      <input type="text" id="pv-emoji-livre" maxlength="4" value="${esc(novoEmoji)}" style="width:90px;text-align:center;font-size:19px"></label>
+
+    <div class="linha" style="justify-content:flex-end;margin-top:6px">
+      <button class="btn" data-x>Cancelar</button>
+      <button class="btn p" data-ok>Salvar</button></div>`,
+    (f, fechar) => {
+      const pv = f.querySelector('#pv-av');
+      const desenhar = () => {
+        const foto = novaFoto === null ? j.foto_url : (novaFoto || null);
+        pv.innerHTML = foto
+          ? `<img class="av" src="${esc(foto)}" alt="" style="width:96px;height:96px">`
+          : `<span style="font-size:62px;line-height:1">${esc(novoEmoji)}</span>`;
+      };
+      desenhar();
+
+      f.querySelector('#pv-file').onchange = async e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          novaFoto = await prepararFoto(file);
+          f.querySelector('#pv-limpar').disabled = false;
+          desenhar();
+        } catch (er) { erro(er.message); }
+      };
+      f.querySelector('#pv-limpar').onclick = () => {
+        novaFoto = ''; f.querySelector('#pv-limpar').disabled = true; desenhar();
+      };
+      f.querySelector('#pv-emojis').onclick = e => {
+        const b = e.target.closest('[data-e]');
+        if (!b) return;
+        novoEmoji = b.dataset.e;
+        f.querySelectorAll('#pv-emojis button').forEach(x => x.classList.toggle('on', x === b));
+        f.querySelector('#pv-emoji-livre').value = novoEmoji;
+        desenhar();
+      };
+      f.querySelector('#pv-emoji-livre').oninput = e => {
+        novoEmoji = e.target.value || '🎱';
+        f.querySelectorAll('#pv-emojis button').forEach(x => x.classList.remove('on'));
+        desenhar();
+      };
+      f.querySelector('[data-x]').onclick = fechar;
+      f.querySelector('[data-ok]').onclick = async e => {
+        e.target.disabled = true; e.target.textContent = 'Salvando…';
+        try {
+          await rpc('fs_definir_perfil',
+            { p_jogador: S.eu, p_emoji: novoEmoji, p_foto: novaFoto });
+          fechar(); bom('Perfil atualizado.'); await recarregar();
+        } catch (er) { erro(er.message); e.target.disabled = false; e.target.textContent = 'Salvar'; }
       };
     });
 }
