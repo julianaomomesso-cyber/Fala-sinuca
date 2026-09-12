@@ -196,7 +196,7 @@ tbody tr:hover { background: rgba(255,255,255,.022); }
 .btn.mini { padding: 5px 11px; font-size: 12.5px; border-radius: 8px; }
 
 label.campo { display: block; margin-bottom: 12px; }
-label.campo > span {
+label.campo > span, .campo > .rot {
   display: block; font-size: 11.5px; font-weight: 700; color: var(--texto-fraco);
   text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px;
 }
@@ -377,7 +377,37 @@ tr.linha-campea td:first-child { box-shadow: inset 3px 0 0 var(--ouro); }
 .emoji-grade button:hover { border-color: var(--ouro); background: var(--painel-alto); }
 .emoji-grade button.on { border-color: var(--ouro); background: rgba(212,160,60,.18); }
 
-label.btn { display: inline-flex; align-items: center; cursor: pointer; }
+div.campo { display: block; margin-bottom: 12px; }
+
+/* ---------- Gerador do confra ---------- */
+.presentes { display: flex; flex-wrap: wrap; gap: 7px; }
+.presentes label {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 999px; padding: 6px 13px 6px 10px; font-size: 13.5px; transition: .12s;
+}
+.presentes label:hover { border-color: var(--borda-forte); }
+.presentes label.on { border-color: var(--ouro); background: rgba(212,160,60,.14); }
+.presentes label input { width: auto; margin: 0; accent-color: var(--ouro); }
+.presentes .p { color: var(--texto-fraco); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+.rodada { border: 1px solid var(--borda); border-radius: 11px; padding: 12px; margin-top: 11px; }
+.rodada-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 9px; }
+.confronto {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 0; border-top: 1px solid rgba(30,58,44,.6);
+}
+.cf-nomes { font-size: 14.5px; }
+.cf-info { margin-left: auto; color: var(--texto-fraco); font-size: 12px; font-variant-numeric: tabular-nums; }
+@media (max-width: 620px) { .cf-info { margin-left: 0; width: 100%; } }
+.rodada-cint {
+  border-color: rgba(212,160,60,.45);
+  background: linear-gradient(180deg, rgba(212,160,60,.07), transparent 60%);
+}
+.confronto { cursor: pointer; }
+.confronto input.cf-ok { width: auto; margin: 0; accent-color: var(--ouro); flex: 0 0 auto; }
+.confronto.recusada { opacity: .4; }
+.confronto.recusada .cf-nomes { text-decoration: line-through; }
 
 </style>
 </head>
@@ -433,6 +463,11 @@ label.btn { display: inline-flex; align-items: center; cursor: pointer; }
 const RATING_BASE = 1000;
 const ODD_DIVISOR = 540;
 
+/* Diferença mínima de rating para uma vitória contar como ZEBRA.
+   Vencer alguém 5 pontos acima não é zebra, é jogo parelho.
+   O admin muda esse corte na tela; isto é só o padrão. */
+const ZEBRA_MINIMA = 50;
+
 /* --- Tabela de pontos por diferença de rating (aba Regras) ---
    GF = favorito vence | PF = zebra vence / favorito perde | PZ = zebra perde */
 function faixaPontos(dif) {
@@ -459,7 +494,7 @@ function ordenarJogos(jogos) {
 /* ============================================================
    PROCESSAR: percorre o histórico e devolve o estado completo
    ============================================================ */
-function processar(jogadores, jogosBrutos) {
+function processar(jogadores, jogosBrutos, zebraMinima = ZEBRA_MINIMA) {
   const jogos = ordenarJogos(jogosBrutos);
   const rating = {};
   const pos = {};
@@ -522,7 +557,8 @@ function processar(jogadores, jogosBrutos) {
       trocou = true;
     }
 
-    const zebra = !empate && !amistoso && !historico &&
+    // Zebra: venceu quem tinha o rating MENOR, e por uma margem que valha a pena.
+    const zebra = !empate && !amistoso && !historico && dif >= zebraMinima &&
       ((rD < rC && g.vencedor_id === D) || (rD > rC && g.vencedor_id === C));
 
     rating[D] = rD + dD;
@@ -764,6 +800,235 @@ function streak(jogadorId, estado) {
   return { tipo, n };
 }
 
+/* ============================================================
+   GERADOR DE JOGOS DO CONFRA
+   ------------------------------------------------------------
+   A noite é uma ESCADA: começa embaixo e vai subindo até o jogo do cinturão.
+     • rodada 1        → confrontos das posições mais baixas
+     • rodadas do meio → vai subindo pela tabela
+     • última rodada   → o #1 dos presentes defende o cinturão
+   Quem ganha embaixo sobe no ladder e chega mais perto do topo antes do fim.
+
+   Dentro de cada faixa da escada, o desempate usa:
+     • posição no ladder  → prioriza confrontos que VALEM posição
+     • rating             → prioriza jogos parelhos (odd perto de 2.00)
+     • histórico H2H      → prioriza quem nunca (ou quase nunca) se enfrentou
+     • rodízio            → todo mundo joga o mesmo tanto, sem jogar 2x seguidas
+   Não simula resultado: monta em cima do estado atual. Ao abrir cada rodada
+   o app revalida se o confronto ainda é desafio de ladder ou virou amistoso.
+   ============================================================ */
+const ESTILOS_CONFRA = {
+  equilibrio: { rotulo: 'Jogos parelhos', prox: 0.40, desafio: 0.15, novidade: 0.15 },
+  posicao:    { rotulo: 'Valendo posição', prox: 0.15, desafio: 0.45, novidade: 0.10 },
+  variedade:  { rotulo: 'Todo mundo com todo mundo', prox: 0.15, desafio: 0.15, novidade: 0.40 }
+};
+
+function gerarConfra(presentesIds, estado, ladder, opts = {}) {
+  const { mesas = 2, jogosPorPessoa = 4, estilo = 'equilibrio', alcance = 2 } = opts;
+  const P = ESTILOS_CONFRA[estilo] || ESTILOS_CONFRA.equilibrio;
+
+  const presentes = presentesIds
+    .map(id => ladder.find(j => j.id === id))
+    .filter(Boolean);
+
+  if (presentes.length < 2) return { rodadas: [], aviso: 'Marque pelo menos dois presentes.' };
+
+  const jogosDe = {};            // quantas partidas cada um já tem na tabela
+  const ultimaRodada = {};       // em que rodada cada um jogou por último
+  const confrontosNoConfra = {}; // pares já escalados hoje
+  presentes.forEach(j => { jogosDe[j.id] = 0; ultimaRodada[j.id] = -9; });
+
+  const chave = (a, b) => [a, b].sort().join('|');
+  const h2h = (a, b) => {
+    const r = estado.stats[a]?.h2h?.[b];
+    return r ? r.v + r.e + r.d : 0;
+  };
+
+  const montarPartida = (x, y) => {
+    const desafiado = x.pos <= y.pos ? x : y;
+    const desafiante = x.pos <= y.pos ? y : x;
+    const gap = Math.abs(x.pos - y.pos);
+    const h = estado.stats[x.id]?.h2h?.[y.id];
+    return {
+      mesa: 1, desafiado, desafiante,
+      tipo: gap >= 1 && gap <= alcance ? 'desafio' : 'amistoso',
+      peloCinturao: desafiado.pos === 1 || desafiante.pos === 1,
+      duelo: !!(lider && segundo && ((x.id === lider.id && y.id === segundo.id) ||
+                                     (y.id === lider.id && x.id === segundo.id))),
+      aprovada: true,
+      dif: Math.abs(x.rating - y.rating), gap,
+      jaJogaram: h ? h.v + h.e + h.d : 0,
+      odd_desafiado: calcOdd(desafiado.rating, desafiante.rating),
+      odd_desafiante: calcOdd(desafiante.rating, desafiado.rating)
+    };
+  };
+
+  const totalPartidas = Math.floor(presentes.length * jogosPorPessoa / 2);
+  const nRodadas = Math.max(1, Math.ceil(totalPartidas / mesas));
+  const rodadas = [];
+
+  // A escada: da posição mais baixa até o topo, ao longo das rodadas.
+  const posTopo = Math.min(...presentes.map(j => j.pos));
+  const posBase = Math.max(...presentes.map(j => j.pos));
+  const faixa = Math.max(1, posBase - posTopo);
+  const lider = presentes.find(j => j.pos === posTopo);
+  // O segundo colocado presente: o duelo #1 x #2 é obrigatório e fecha a noite.
+  const segundo = presentes.filter(j => j.id !== lider?.id).sort((a, b) => a.pos - b.pos)[0];
+
+  for (let r = 0; r < nRodadas; r++) {
+    const ultima = r === nRodadas - 1;
+    // Onde a noite está na escada: começa na base, termina no #1.
+    const alvo = posBase - (r / Math.max(1, nRodadas - 1)) * faixa;
+    const ocupados = new Set();
+    const partidas = [];
+
+    // monta todos os pares possíveis e dá uma nota para cada um
+    const pares = [];
+    for (let i = 0; i < presentes.length; i++) {
+      for (let k = i + 1; k < presentes.length; k++) {
+        const a = presentes[i], b = presentes[k];
+        if (jogosDe[a.id] >= jogosPorPessoa || jogosDe[b.id] >= jogosPorPessoa) continue;
+
+        const dif = Math.abs(a.rating - b.rating);
+        const fProx = 1 - Math.min(1, dif / 300);
+
+        const gap = Math.abs(a.pos - b.pos);
+        const ehDesafio = gap >= 1 && gap <= alcance;
+        const desafiante = a.pos > b.pos ? a : b;      // quem está embaixo é quem desafia
+        const desafiado = a.pos > b.pos ? b : a;
+
+        const jaJogaram = h2h(a.id, b.id);
+        const repetidoHoje = confrontosNoConfra[chave(a.id, b.id)] || 0;
+        const fNovidade = 1 / (1 + jaJogaram + repetidoHoje * 3);
+
+        const fRodizio = 1 - (jogosDe[a.id] + jogosDe[b.id]) / (2 * jogosPorPessoa + 1);
+        const descansou = (r - ultimaRodada[a.id] > 1) && (r - ultimaRodada[b.id] > 1);
+
+        // A ESCADA manda: a altura do confronto é a melhor posição dos dois.
+        const altura = Math.min(a.pos, b.pos);
+        const fEscada = 1 - Math.min(1, Math.abs(altura - alvo) / faixa);
+
+        // Degrau: escada se sobe de vizinho em vizinho. Par distante desanda a noite.
+        const fVizinho = 1 - Math.min(1, Math.max(0, gap - alcance) / 4);
+
+        // O cinturão é o fecho: o líder só entra na reta final.
+        const envolveLider = lider && (a.id === lider.id || b.id === lider.id);
+        const envolveSegundo = segundo && (a.id === segundo.id || b.id === segundo.id);
+        // O líder só entra na reta final, e uma vaga fica guardada para a última rodada.
+        if (envolveLider && r < nRodadas - Math.max(1, jogosPorPessoa)) continue;
+        if (envolveLider && !ultima && jogosDe[lider.id] >= jogosPorPessoa - 1) continue;
+        // O #2 também guarda uma vaga: o duelo do cinturão é obrigatório.
+        if (envolveSegundo && !ultima && jogosDe[segundo.id] >= jogosPorPessoa - 1) continue;
+
+        const nota = 0.50 * fEscada
+                   + 0.35 * fVizinho
+                   + (ultima && envolveLider ? 0.80 : 0)
+                   + P.prox * fProx
+                   + P.desafio * (ehDesafio ? 1 : 0)
+                   + P.novidade * fNovidade
+                   + 0.18 * fRodizio
+                   + 0.05 * (descansou ? 1 : 0);
+
+        pares.push({ a, b, nota, dif, gap, ehDesafio, desafiante, desafiado, jaJogaram });
+      }
+    }
+
+    pares.sort((x, y) => y.nota - x.nota);
+
+    const escalar = par => {
+      if (partidas.length >= mesas) return false;
+      if (ocupados.has(par.a.id) || ocupados.has(par.b.id)) return false;
+      ocupados.add(par.a.id); ocupados.add(par.b.id);
+      jogosDe[par.a.id]++; jogosDe[par.b.id]++;
+      ultimaRodada[par.a.id] = r; ultimaRodada[par.b.id] = r;
+      confrontosNoConfra[chave(par.a.id, par.b.id)] =
+        (confrontosNoConfra[chave(par.a.id, par.b.id)] || 0) + 1;
+      partidas.push(montarPartida(par.a, par.b));
+      return true;
+    };
+
+    const inedito = x => !confrontosNoConfra[chave(x.a.id, x.b.id)];
+
+    // A última rodada é a DECISÃO DO CINTURÃO: #1 contra #2, sempre.
+    if (ultima && lider && segundo) {
+      const duelo = pares.find(x =>
+        (x.a.id === lider.id && x.b.id === segundo.id) ||
+        (x.b.id === lider.id && x.a.id === segundo.id));
+      if (duelo) escalar(duelo);
+      else {
+        // Se o par não sobrou entre os candidatos, monta na marra — é obrigatório.
+        const gapD = Math.abs(lider.pos - segundo.pos);
+        escalar({
+          a: lider, b: segundo, nota: 99, gap: gapD,
+          dif: Math.abs(lider.rating - segundo.rating),
+          ehDesafio: gapD >= 1 && gapD <= alcance,
+          desafiante: segundo, desafiado: lider,
+          jaJogaram: (estado.stats[lider.id]?.h2h?.[segundo.id]
+            ? estado.stats[lider.id].h2h[segundo.id].v + estado.stats[lider.id].h2h[segundo.id].e
+              + estado.stats[lider.id].h2h[segundo.id].d : 0)
+        });
+      }
+    }
+
+    // Confrontos entre vizinhos primeiro, e sem repetir quem já jogou junto hoje.
+    // Teto de distância: melhor deixar a mesa vazia do que marcar #1 contra #8.
+    const perto = pares.filter(x => x.gap <= alcance + 3);
+    for (const par of [...perto.filter(inedito), ...perto]) {
+      if (partidas.length >= mesas) break;
+      escalar(par);
+    }
+    // Só se a rodada ficaria completamente vazia é que o teto é relaxado.
+    if (!partidas.length) {
+      for (const par of [...pares.filter(inedito), ...pares]) {
+        if (partidas.length >= mesas) break;
+        escalar(par);
+      }
+    }
+
+    if (!partidas.length) break;
+    // Dentro da rodada, a mesa 1 é sempre o confronto mais alto da tabela.
+    partidas.sort((x, y) => Math.min(x.desafiado.pos, x.desafiante.pos)
+                          - Math.min(y.desafiado.pos, y.desafiante.pos));
+    partidas.forEach((x, i) => { x.mesa = i + 1; });
+
+    rodadas.push({
+      n: rodadas.length + 1,
+      partidas,
+      temCinturao: partidas.some(x => x.peloCinturao),
+      folga: presentes.filter(j => !ocupados.has(j.id)).map(j => j.nome)
+    });
+  }
+
+  // Regra de ouro: o duelo #1 x #2 SEMPRE fecha a noite, aconteça o que acontecer.
+  if (lider && segundo && !rodadas.some(r => r.partidas.some(p => p.duelo))) {
+    rodadas.push({
+      n: rodadas.length + 1,
+      partidas: [montarPartida(lider, segundo)],
+      temCinturao: true,
+      folga: presentes.filter(j => j.id !== lider.id && j.id !== segundo.id).map(j => j.nome)
+    });
+    jogosDe[lider.id]++; jogosDe[segundo.id]++;
+  }
+
+  // O clímax é o cinturão: a rodada com o melhor jogo do líder vai para o fim.
+  if (lider && rodadas.length > 1) {
+    const iCint = rodadas.map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.partidas.some(p => p.duelo))
+      .map(({ i }) => i).pop();
+    if (iCint != null && iCint !== rodadas.length - 1) {
+      rodadas.push(rodadas.splice(iCint, 1)[0]);
+      rodadas.forEach((r, i) => { r.n = i + 1; });
+    }
+  }
+
+  return {
+    rodadas,
+    resumo: presentes
+      .map(j => ({ nome: j.nome, id: j.id, jogos: jogosDe[j.id] }))
+      .sort((a, b) => b.jogos - a.jogos || a.nome.localeCompare(b.nome))
+  };
+}
+
 
 /* ===== APLICACAO ===== */
 /* ===========================================================================
@@ -784,8 +1049,9 @@ function toast(msg, tipo = '') {
   t.className = 'toast ' + tipo;
   t.textContent = msg;
   $('#toasts').appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, 3600);
-  setTimeout(() => t.remove(), 3950);
+  const ms = tipo === 'erro' ? 7000 : 3600;
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, ms);
+  setTimeout(() => t.remove(), ms + 350);
 }
 const erro = m => toast(m, 'erro');
 const bom = m => toast(m, 'bom');
@@ -818,7 +1084,7 @@ const saldoAtual = id => saldoDe(id, S.carteira);
 const cfg = (k, d) => (S.config[k] !== undefined ? S.config[k] : d);
 
 function recalcular() {
-  S.estado = processar(S.jogadores, S.jogos);
+  S.estado = processar(S.jogadores, S.jogos, Number(cfg('zebra_minima', 50)));
   S.ladder = montarLadder(S.jogadores, S.estado);
   S.ranking = montarRanking(S.jogadores, S.estado);
 }
@@ -852,7 +1118,14 @@ async function recarregar() {
 /** Chama uma função do banco e trata o erro com mensagem legível. */
 async function rpc(nome, args) {
   const { data, error } = await sb.rpc(nome, args);
-  if (error) throw new Error((error.message || '').replace(/^.*?:\s*/, '') || 'Erro no servidor');
+  if (error) {
+    const cru = error.message || '';
+    // Erros típicos de banco desatualizado — vale explicar em vez de mostrar o texto do Postgres.
+    if (/could not find the function|does not exist|schema cache/i.test(cru)) {
+      throw new Error('O banco ainda está na versão antiga. Rode o 1-banco.sql atualizado no Supabase.');
+    }
+    throw new Error(cru.replace(/^.*?:\s*/, '') || 'Erro no servidor');
+  }
   return data;
 }
 
@@ -1627,6 +1900,42 @@ function viewAdm() {
   </div>
 
   <div class="card">
+    <h2>🍻 Gerador de jogos do confra</h2>
+    <p class="sub">Marque quem apareceu e o app monta a tabela da noite. A noite é uma
+      <b>escada</b>: começa nos confrontos de baixo, vai subindo pela tabela, e a última
+      rodada é sempre <b>#1 contra #2, valendo o cinturão</b>. Quem ganha cedo sobe no
+      ladder e chega mais perto do topo antes de a noite acabar.<br><br>
+      <b>Rodada</b> = os jogos que acontecem ao mesmo tempo. Com 1 mesa, cada rodada tem
+      1 jogo; com 2 mesas, 2 jogos rolam juntos. Depois de gerar, você aprova ou tira
+      cada partida antes de abrir.</p>
+
+    <div class="linha" style="margin-bottom:10px">
+      <button class="btn mini" id="cf-todos">Marcar todos</button>
+      <button class="btn mini" id="cf-nenhum">Desmarcar</button>
+      <span id="cf-conta" style="color:var(--texto-fraco);font-size:13px"></span>
+    </div>
+    <div class="presentes" id="cf-presentes">
+      ${S.ladder.map(j => `<label class="${(S.confraPresentes || []).includes(j.id) ? 'on' : ''}">
+        <input type="checkbox" value="${esc(j.id)}" ${(S.confraPresentes || []).includes(j.id) ? 'checked' : ''}>
+        <span class="p">#${j.pos}</span> ${esc(j.nome)}</label>`).join('')}
+    </div>
+
+    <div class="grade g3" style="margin-top:14px">
+      <label class="campo"><span>Quantas mesas de sinuca</span>
+        <input type="number" id="cf-mesas" min="1" max="6" value="${S.confraOpts?.mesas ?? 1}"></label>
+      <label class="campo"><span>Jogos por pessoa</span>
+        <input type="number" id="cf-jpp" min="1" max="10" value="${S.confraOpts?.jogosPorPessoa ?? 3}"></label>
+      <label class="campo"><span>Como montar</span>
+        <select id="cf-estilo">
+          ${Object.entries(ESTILOS_CONFRA).map(([k, v]) =>
+            `<option value="${k}" ${(S.confraOpts?.estilo ?? 'equilibrio') === k ? 'selected' : ''}>${esc(v.rotulo)}</option>`).join('')}
+        </select></label>
+    </div>
+    <button class="btn p" id="cf-gerar">Gerar tabela</button>
+    <div id="cf-saida">${S.confra ? tabelaConfra(S.confra) : ''}</div>
+  </div>
+
+  <div class="card">
     <h2>Lançar partida avulsa</h2>
     <p class="sub">Para jogos que aconteceram fora do fluxo de desafio.</p>
     <div class="grade g2">
@@ -1733,7 +2042,14 @@ function viewAdm() {
         <input type="number" data-cfg="aposta_maxima" value="${esc(cfg('aposta_maxima', 5000))}"></label>
       <label class="campo"><span>Alcance do desafio (posições acima)</span>
         <input type="number" data-cfg="alcance_desafio" value="${esc(cfg('alcance_desafio', 2))}"></label>
+      <label class="campo"><span>Zebra: diferença mínima de rating</span>
+        <input type="number" data-cfg="zebra_minima" min="0" step="10" value="${esc(cfg('zebra_minima', 50))}"></label>
     </div>
+    <p style="font-size:12.5px;color:var(--texto-fraco);margin:-4px 0 12px">
+      <b>Zebra</b> — só conta quando o vencedor tinha rating pelo menos essa diferença abaixo
+      do adversário. Com 50, vencer alguém 5 pontos acima deixa de virar zebra. Hoje o grupo está
+      muito nivelado (945 a 1090), então valores acima de 110 zerariam as zebras.
+      Mexe só na etiqueta e na estatística: a troca de pontos do rating não muda.</p>
     <button class="btn p" id="btn-cfg">Salvar configurações</button>
   </div>
 
@@ -1752,6 +2068,74 @@ function viewAdm() {
           ${esc(JSON.stringify(a.detalhe || {}).slice(0, 90))}</td>
       </tr>`).join('')}</tbody></table></div>` : ''}</div>
   </div>`;
+}
+
+function tabelaConfra(g) {
+  if (!g.rodadas?.length) return `<div class="aviso alerta"><div>${esc(g.aviso || 'Não deu para montar a tabela.')}</div></div>`;
+  const todas = g.rodadas.flatMap(r => r.partidas);
+  const ok = todas.filter(p => p.aprovada);
+  const total = todas.length;
+  const desafios = ok.filter(p => p.tipo === 'desafio').length;
+
+  return `
+    <div class="aviso ${ok.length ? 'bom' : 'alerta'}" style="margin-top:16px"><div>
+      <b>${ok.length} de ${total} partidas aprovadas</b>, em ${g.rodadas.length} rodadas.
+      ${desafios} valem posição no ladder, ${ok.length - desafios} são amistosos.
+      A noite sobe da <b>#${Math.max(...g.rodadas[0].partidas.map(p => Math.max(p.desafiado.pos, p.desafiante.pos)))}</b>
+      até <b>#1 × #2 pelo cinturão</b> na rodada ${g.rodadas.length}.<br>
+      ${(() => {
+        const c = {};
+        ok.forEach(p => { for (const j of [p.desafiado, p.desafiante]) c[j.nome] = (c[j.nome] || 0) + 1; });
+        return Object.entries(c).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .map(([n, v]) => `${esc(n)}: ${v}`).join(' · ');
+      })()}<br>
+      <span style="color:var(--texto-fraco)">Desmarque o que não vai rolar antes de abrir.</span>
+    </div></div>
+    <div class="linha" style="margin:10px 0 4px">
+      <button class="btn mini" id="cf-copiar">Copiar tabela</button>
+      <button class="btn mini" id="cf-marcar-tudo">Aprovar todas</button>
+      <button class="btn mini p" id="cf-abrir-tudo">Abrir as aprovadas no app</button>
+    </div>
+    ${g.rodadas.map(r => `
+      <div class="rodada${r.temCinturao ? ' rodada-cint' : ''}">
+        <div class="rodada-topo">
+          <b>Rodada ${r.n}</b>
+          ${r.n === g.rodadas.length ? '<span class="tag t-ouro">🏆 decisão do cinturão</span>' : ''}
+          ${r.folga.length ? `<span style="color:var(--texto-fraco);font-size:12.5px">folga: ${esc(r.folga.join(', '))}</span>` : ''}
+          <button class="btn mini ok" data-abrir-rodada="${r.n}" style="margin-left:auto"
+            ${r.partidas.some(p => p.aprovada) ? '' : 'disabled'}>Abrir no app</button>
+        </div>
+        ${r.partidas.map((p, i) => `
+          <label class="confronto${p.aprovada ? '' : ' recusada'}">
+            <input type="checkbox" class="cf-ok" data-r="${r.n}" data-i="${i}" ${p.aprovada ? 'checked' : ''}>
+            ${p.duelo ? '<span class="tag t-ouro">🏆 cinturão</span>'
+                      : p.peloCinturao ? '<span class="tag t-ouro">🏆</span>' : ''}
+            <span class="tag ${p.tipo === 'desafio' ? 't-ouro' : 't-azul'}">${p.tipo}</span>
+            <span class="cf-nomes"><b>#${p.desafiado.pos} ${esc(p.desafiado.nome)}</b>
+              <span style="color:var(--texto-fraco)">×</span>
+              <b>#${p.desafiante.pos} ${esc(p.desafiante.nome)}</b></span>
+            <span class="cf-info">${p.odd_desafiado.toFixed(2)} / ${p.odd_desafiante.toFixed(2)}
+              · dif ${p.dif} · ${p.jaJogaram ? p.jaJogaram + 'º confronto' : 'nunca se enfrentaram'}</span>
+          </label>`).join('')}
+      </div>`).join('')}`;
+}
+
+function textoConfra(g) {
+  const linhas = ['🎱 FALA SINUCA — jogos da noite',
+    'Começa embaixo e sobe até a decisão do cinturão.', ''];
+  g.rodadas.forEach(r => {
+    const lista = r.partidas.filter(p => p.aprovada);
+    if (!lista.length) return;
+    linhas.push(`*Rodada ${r.n}*` + (r.n === g.rodadas.length ? '  🏆 DECISÃO DO CINTURÃO' : ''));
+    lista.forEach(p => linhas.push(
+      `  Mesa ${p.mesa}: ${p.desafiado.nome} (#${p.desafiado.pos}) x ${p.desafiante.nome} (#${p.desafiante.pos})` +
+      (p.tipo === 'desafio' ? '  — vale posição' : '  — amistoso') +
+      (p.peloCinturao ? '  🏆' : '')));
+    if (r.folga.length) linhas.push(`  _folga: ${r.folga.join(', ')}_`);
+    linhas.push('');
+  });
+  linhas.push('Apostas abertas no app 🪙');
+  return linhas.join('\n');
 }
 
 /* ------------------------------------------------------------ eventos */
@@ -1879,6 +2263,93 @@ function ligarEventos(raiz) {
     if (error) return erro(error.message);
     bom(`${j.nome} ${j.ativo ? 'desativado' : 'reativado'}.`);
     await recarregar();
+  });
+
+  /* ---------- gerador do confra ---------- */
+  const cxs = () => [...raiz.querySelectorAll('#cf-presentes input')];
+  const marcados = () => cxs().filter(c => c.checked).map(c => c.value);
+  const atualizaConta = () => {
+    const n = marcados().length;
+    const el = raiz.querySelector('#cf-conta');
+    if (el) el.textContent = n ? `${n} presente(s)` : 'ninguém marcado ainda';
+    cxs().forEach(c => c.parentElement.classList.toggle('on', c.checked));
+  };
+  atualizaConta();
+  raiz.querySelector('#cf-presentes')?.addEventListener('change', () => {
+    S.confraPresentes = marcados(); atualizaConta();
+  });
+  raiz.querySelector('#cf-todos')?.addEventListener('click', () => {
+    cxs().forEach(c => c.checked = true); S.confraPresentes = marcados(); atualizaConta();
+  });
+  raiz.querySelector('#cf-nenhum')?.addEventListener('click', () => {
+    cxs().forEach(c => c.checked = false); S.confraPresentes = []; atualizaConta();
+  });
+
+  raiz.querySelector('#cf-gerar')?.addEventListener('click', () => {
+    const presentes = marcados();
+    if (presentes.length < 2) return erro('Marque pelo menos dois presentes.');
+    S.confraPresentes = presentes;
+    S.confraOpts = {
+      mesas: Math.max(1, Number(raiz.querySelector('#cf-mesas').value) || 2),
+      jogosPorPessoa: Math.max(1, Number(raiz.querySelector('#cf-jpp').value) || 3),
+      estilo: raiz.querySelector('#cf-estilo').value,
+      alcance: Number(cfg('alcance_desafio', 2))
+    };
+    S.confra = gerarConfra(presentes, S.estado, S.ladder, S.confraOpts);
+    render();
+    bom(`${S.confra.rodadas.reduce((t, r) => t + r.partidas.length, 0)} partidas montadas.`);
+  });
+
+  raiz.querySelectorAll('.cf-ok').forEach(c => c.onchange = () => {
+    const r = S.confra?.rodadas.find(x => x.n === Number(c.dataset.r));
+    const p = r?.partidas[Number(c.dataset.i)];
+    if (!p) return;
+    p.aprovada = c.checked;
+    render();
+  });
+  raiz.querySelector('#cf-marcar-tudo')?.addEventListener('click', () => {
+    S.confra.rodadas.forEach(r => r.partidas.forEach(p => { p.aprovada = true; }));
+    render();
+  });
+
+  raiz.querySelector('#cf-copiar')?.addEventListener('click', async () => {
+    const txt = textoConfra(S.confra);
+    try { await navigator.clipboard.writeText(txt); bom('Tabela copiada — é só colar no grupo.'); }
+    catch { modal('Tabela da noite',
+      `<textarea rows="14" readonly style="font-family:ui-monospace,monospace;font-size:12.5px">${esc(txt)}</textarea>
+       <div class="linha" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-x>Fechar</button></div>`,
+      (f, fechar) => { f.querySelector('[data-x]').onclick = fechar; f.querySelector('textarea').select(); }); }
+  });
+
+  const abrirPartidas = async (partidas, rotulo) => {
+    let ok = 0; const falhas = [];
+    for (const p of partidas) {
+      try {
+        await rpc('fs_abrir_jogo_confra',
+          { p_desafiado: p.desafiado.id, p_desafiante: p.desafiante.id });
+        ok++;
+      } catch (e) { falhas.push(`${p.desafiado.nome} × ${p.desafiante.nome}: ${e.message}`); }
+    }
+    if (ok) bom(`${rotulo}: ${ok} jogo(s) aberto(s) para apostas.`);
+    if (falhas.length) erro(falhas[0] + (falhas.length > 1 ? ` (+${falhas.length - 1})` : ''));
+    await recarregar();
+  };
+
+  raiz.querySelectorAll('[data-abrir-rodada]').forEach(b => b.onclick = async () => {
+    const r = S.confra.rodadas.find(x => x.n === Number(b.dataset.abrirRodada));
+    if (!r) return;
+    const lista = r.partidas.filter(p => p.aprovada);
+    if (!lista.length) return erro('Nenhuma partida aprovada nesta rodada.');
+    b.disabled = true; b.textContent = 'Abrindo…';
+    await abrirPartidas(lista, `Rodada ${r.n}`);
+  });
+
+  raiz.querySelector('#cf-abrir-tudo')?.addEventListener('click', async e => {
+    const todas = S.confra.rodadas.flatMap(r => r.partidas).filter(p => p.aprovada);
+    if (!todas.length) return erro('Nenhuma partida aprovada.');
+    if (!confirm(`Abrir as ${todas.length} partidas aprovadas de uma vez? O pessoal poderá apostar em todas.`)) return;
+    e.target.disabled = true; e.target.textContent = 'Abrindo…';
+    await abrirPartidas(todas, 'Confra');
   });
 
   raiz.querySelector('#btn-cfg')?.addEventListener('click', async e => {
@@ -2072,24 +2543,30 @@ function abrirPersonalizar() {
   let novaFoto = null;          // null = não mexeu | '' = remover | data URL = trocar
   let novoEmoji = j.emoji || '🎱';
 
+  // Se a coluna foto_url não voltou do banco, o 1-banco.sql novo ainda não foi rodado.
+  const bancoVelho = !('foto_url' in j);
+
   modal('Personalizar meu perfil', `
+    ${bancoVelho ? `<div class="aviso erro"><div><b>O banco ainda está na versão antiga.</b><br>
+      Rode o arquivo <code>1-banco.sql</code> atualizado no SQL Editor do Supabase — sem isso
+      a foto não tem onde ser salva.</div></div>` : ''}
     <div style="text-align:center;margin-bottom:16px">
       <div id="pv-av" style="display:inline-grid;place-items:center"></div>
       <div style="font-weight:700;margin-top:8px;font-size:16px">${esc(j.nome)}</div>
     </div>
 
-    <label class="campo"><span>Foto</span>
+    <div class="campo"><span class="rot">Foto</span>
       <div class="linha">
-        <label class="btn mini" style="margin:0">
-          Escolher foto<input type="file" id="pv-file" accept="image/*" hidden>
-        </label>
-        <button class="btn mini" id="pv-limpar" ${j.foto_url ? '' : 'disabled'}>Tirar a foto</button>
+        <button type="button" class="btn mini" id="pv-escolher">Escolher foto</button>
+        <button type="button" class="btn mini" id="pv-limpar" ${j.foto_url ? '' : 'disabled'}>Tirar a foto</button>
       </div>
-    </label>
-    <p style="font-size:12px;color:var(--texto-fraco);margin:-6px 0 14px">
+    </div>
+    <input type="file" id="pv-file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif,image/*"
+           style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+    <p style="font-size:12px;color:var(--texto-fraco);margin:4px 0 14px">
       A imagem é cortada em quadrado e reduzida aqui no seu aparelho antes de subir.</p>
 
-    <label class="campo"><span>Emoji (aparece quando não tem foto)</span></label>
+    <div class="campo"><span class="rot">Emoji (aparece quando não tem foto)</span></div>
     <div class="emoji-grade" id="pv-emojis">
       ${EMOJIS.map(e => `<button type="button" data-e="${e}" class="${e === novoEmoji ? 'on' : ''}">${e}</button>`).join('')}
     </div>
@@ -2109,7 +2586,9 @@ function abrirPersonalizar() {
       };
       desenhar();
 
-      f.querySelector('#pv-file').onchange = async e => {
+      const inpFile = f.querySelector('#pv-file');
+      f.querySelector('#pv-escolher').onclick = () => inpFile.click();
+      inpFile.onchange = async e => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {

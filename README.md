@@ -102,6 +102,7 @@ ladder. Ainda existe uma terceira opção, **"Não conta nada"**, para treino ou
 | Lançar o vencedor da **própria** partida | ✅ | ✅ |
 | Lançar o vencedor de partida dos outros | ❌ | ✅ |
 | Ajustar os cinturões | ❌ | ✅ |
+| Gerar a tabela do confra | ❌ | ✅ |
 | Criar ou tirar moedas | ❌ | ✅ |
 | Cadastrar jogador, ajustar posição, apagar jogo | ❌ | ✅ |
 | Mudar configurações e ler a auditoria | ❌ | ✅ |
@@ -123,7 +124,8 @@ rating, apagar jogo ou ler a auditoria recebe `permission denied` em todos os ca
 - **Carteira** — saldo, extrato e o Fala Score de apostador.
 - **Perfil** — foto, cinturões conquistados, Fala Score detalhado, evolução do rating e
   confrontos diretos (H2H). É aqui que cada um se personaliza.
-- **🔒 ADM** — só você. Tem também o botão de **baixar backup em JSON**.
+- **🔒 ADM** — só você. Lançar resultado, gerador de jogos do confra, moedas, jogadores,
+  configurações, auditoria e o botão de **baixar backup em JSON**.
 
 ---
 
@@ -148,9 +150,64 @@ A odd fica **travada no momento em que a pessoa aposta**.
 
 **Ranking** — vitória 3 pontos, empate 1, derrota 0. Ordem por rating.
 
+**Zebra** — venceu quem tinha o rating menor, **e por uma margem que valha a pena**.
+O corte fica em ADM → Configurações, e vem em 50 pontos. Sem esse corte, vencer alguém
+5 pontos acima virava zebra: no histórico importado da planilha eram 16 zebras em 34
+partidas, quase metade. Com 50, sobram 4 — aí a etiqueta significa alguma coisa. Isso mexe
+só na etiqueta e na estatística de "zebras dadas"; a troca de pontos do rating não muda.
+
 Rating e posição **não ficam salvos** no banco: são recalculados a partir do histórico
 toda vez. Por isso nunca dessincroniza — e corrigir uma partida antiga arruma sozinho
 tudo o que veio depois.
+
+---
+
+## Gerador de jogos do confra
+
+Na aba ADM. Você marca quem apareceu, diz quantas mesas tem e quantos jogos cada um vai
+fazer, e o app monta a tabela da noite inteira.
+
+**Rodada = os jogos que acontecem ao mesmo tempo.** Se você tem 1 mesa de sinuca, cada
+rodada tem 1 jogo. Com 2 mesas, 2 jogos rolam juntos. O campo *Quantas mesas de sinuca*
+é quem decide isso, e vem em 1.
+
+**A noite é uma escada.** Ela começa nos confrontos lá de baixo, vai subindo pela tabela
+e a última rodada é sempre **#1 contra #2, valendo o cinturão** — essa partida é
+obrigatória e fecha a noite, sempre. Quem ganha cedo sobe no ladder e chega mais perto do
+topo antes de a noite acabar.
+
+O #1 e o #2 ficam guardados: só entram na reta final. Os confrontos também respeitam
+distância — o app não marca #1 contra #8. Se não sobrar ninguém à altura, a mesa fica
+vazia em vez de virar um jogo sem graça.
+
+**Você aprova antes de abrir.** Cada partida gerada vem com uma caixinha marcada.
+Desmarque o que não vai rolar e ela é riscada, some do texto do grupo e não é aberta.
+O resumo no topo mostra quantas estão aprovadas e quantos jogos cada um vai fazer.
+
+Dentro de cada degrau da escada, o desempate usa:
+
+- **Ladder** — prioriza jogos que valem posição (desafio de até 2 acima).
+- **Rating** — prioriza jogos parelhos, onde a odd fica perto de 2.00.
+- **Histórico** — prioriza quem nunca ou quase nunca se enfrentou.
+- **Rodízio** — todo mundo joga o mesmo tanto e o mesmo confronto não se repete na noite
+  (a não ser que não tenha jeito).
+
+Três jeitos de montar, dependendo do que você quer da noite:
+
+| | O que prioriza |
+|---|---|
+| **Jogos parelhos** | equilíbrio — quase todo jogo com odd perto de 2.00 |
+| **Valendo posição** | o máximo de desafios de ladder, mexendo bastante no ranking |
+| **Todo mundo com todo mundo** | confrontos inéditos, para preencher o histórico |
+
+Cada confronto vem com a etiqueta (desafio ou amistoso), as duas odds, a diferença de
+rating e quantas vezes aqueles dois já se enfrentaram. Os jogos que envolvem o cinturão
+levam 🏆, e a última rodada aparece destacada em dourado.
+
+Dois botões no fim: **Copiar tabela** (sai um texto pronto para colar no grupo do WhatsApp)
+e **Abrir no app** — por rodada ou tudo de uma vez. Ao abrir, cada jogo é revalidado na
+hora: se o confronto não for mais um desafio válido (porque o ladder mudou durante a
+noite), ele entra como amistoso sozinho. A partir daí o pessoal já pode apostar.
 
 ---
 
