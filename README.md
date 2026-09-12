@@ -192,13 +192,21 @@ Dentro de cada degrau da escada, o desempate usa:
 - **Rodízio** — todo mundo joga o mesmo tanto e o mesmo confronto não se repete na noite
   (a não ser que não tenha jeito).
 
-Três jeitos de montar, dependendo do que você quer da noite:
+**Cinco modos**, dependendo do que você quer da noite:
 
-| | O que prioriza |
+| Modo | O que prioriza |
 |---|---|
-| **Jogos parelhos** | equilíbrio — quase todo jogo com odd perto de 2.00 |
-| **Valendo posição** | o máximo de desafios de ladder, mexendo bastante no ranking |
-| **Todo mundo com todo mundo** | confrontos inéditos, para preencher o histórico |
+| **Por desafios** | o máximo de jogos valendo posição — a noite mexe muito no ladder |
+| **Por ranking** | quem tem rating parecido joga entre si — as odds ficam perto de 2.00 |
+| **Jogos nunca jogados** | confrontos inéditos primeiro, para preencher o histórico |
+| **Por emoção** | clássicos e rivalidades: quem já se enfrentou muito, tem retrospecto apertado, e está numa boa sequência |
+| **Aleatório** | sorteio — dá o que vier |
+
+Todos respeitam a escada e fecham em #1 × #2. O que muda é o critério de escolha dentro
+de cada degrau.
+
+**🎲 Gerar outra** monta uma noite diferente com o mesmo modo. Se a tabela sair idêntica,
+o app tenta outras combinações até achar uma que mude de verdade.
 
 Cada confronto vem com a etiqueta (desafio ou amistoso), as duas odds, a diferença de
 rating e quantas vezes aqueles dois já se enfrentaram. Os jogos que envolvem o cinturão

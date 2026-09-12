@@ -409,6 +409,17 @@ div.campo { display: block; margin-bottom: 12px; }
 .confronto.recusada { opacity: .4; }
 .confronto.recusada .cf-nomes { text-decoration: line-through; }
 
+.modos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.modos button {
+  text-align: left; background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 11px; padding: 10px 13px; transition: .13s; display: grid; gap: 2px;
+}
+.modos button:hover { border-color: var(--borda-forte); background: var(--painel-alto); }
+.modos button.on { border-color: var(--ouro); background: rgba(212,160,60,.13); }
+.modos button b { font-size: 13.5px; font-weight: 700; }
+.modos button.on b { color: var(--ouro-claro); }
+.modos button small { font-size: 11.5px; color: var(--texto-fraco); line-height: 1.35; }
+
 </style>
 </head>
 <body>
@@ -818,14 +829,51 @@ function streak(jogadorId, estado) {
    o app revalida se o confronto ainda é desafio de ladder ou virou amistoso.
    ============================================================ */
 const ESTILOS_CONFRA = {
-  equilibrio: { rotulo: 'Jogos parelhos', prox: 0.40, desafio: 0.15, novidade: 0.15 },
-  posicao:    { rotulo: 'Valendo posição', prox: 0.15, desafio: 0.45, novidade: 0.10 },
-  variedade:  { rotulo: 'Todo mundo com todo mundo', prox: 0.15, desafio: 0.15, novidade: 0.40 }
+  desafios: {
+    rotulo: 'Por desafios — o máximo de jogos valendo posição',
+    escada: 0.50, vizinho: 0.40, desafio: 0.55, prox: 0.10, novidade: 0.10,
+    emocao: 0.05, acaso: 0.06, soDesafio: true
+  },
+  ranking: {
+    rotulo: 'Por ranking — quem tem rating parecido joga entre si',
+    escada: 0.50, vizinho: 0.35, desafio: 0.10, prox: 0.55, novidade: 0.10,
+    emocao: 0.05, acaso: 0.15
+  },
+  ineditos: {
+    rotulo: 'Jogos nunca jogados — confrontos inéditos primeiro',
+    escada: 0.40, vizinho: 0.18, desafio: 0.10, prox: 0.10, novidade: 0.60,
+    emocao: 0.05, acaso: 0.22
+  },
+  emocao: {
+    rotulo: 'Por emoção — clássicos, rivalidades e quem está quente',
+    escada: 0.42, vizinho: 0.22, desafio: 0.12, prox: 0.15, novidade: 0.05,
+    emocao: 0.55, acaso: 0.22
+  },
+  aleatorio: {
+    rotulo: 'Aleatório — no sorteio, dá o que vier',
+    escada: 0.18, vizinho: 0.08, desafio: 0.05, prox: 0.05, novidade: 0.05,
+    emocao: 0.05, acaso: 0.90
+  }
 };
 
+/* Sorteio com semente: a mesma semente devolve sempre a mesma tabela,
+   e trocar a semente ("Gerar outra") dá uma noite diferente. */
+function acasoDe(semente) {
+  return chaveTexto => {
+    let h = semente >>> 0;
+    for (let i = 0; i < chaveTexto.length; i++) {
+      h = Math.imul(h ^ chaveTexto.charCodeAt(i), 2654435761) >>> 0;
+    }
+    h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0;
+    h ^= h >>> 13; h = Math.imul(h, 3266489909) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  };
+}
+
 function gerarConfra(presentesIds, estado, ladder, opts = {}) {
-  const { mesas = 2, jogosPorPessoa = 4, estilo = 'equilibrio', alcance = 2 } = opts;
-  const P = ESTILOS_CONFRA[estilo] || ESTILOS_CONFRA.equilibrio;
+  const { mesas = 1, jogosPorPessoa = 3, estilo = 'ranking', alcance = 2, semente = 1 } = opts;
+  const P = ESTILOS_CONFRA[estilo] || ESTILOS_CONFRA.ranking;
+  const acaso = acasoDe(semente);
 
   const presentes = presentesIds
     .map(id => ladder.find(j => j.id === id))
@@ -844,6 +892,24 @@ function gerarConfra(presentesIds, estado, ladder, opts = {}) {
     return r ? r.v + r.e + r.d : 0;
   };
 
+  /* EMOÇÃO — o que faz um jogo valer a pena de assistir:
+       clássico    → já se enfrentaram muitas vezes
+       equilibrado → o retrospecto entre os dois está empatado
+       quente      → os dois vêm ganhando
+       parelho     → as odds ficam perto de 2.00                              */
+  const emocaoDe = (a, b, fProx) => {
+    const r = estado.stats[a.id]?.h2h?.[b.id];
+    const n = r ? r.v + r.e + r.d : 0;
+    const fClassico = Math.min(1, n / 5);
+    const fBrigado = n ? 1 - Math.abs(r.v - r.d) / n : 0.4;
+    const quente = j => {
+      const ult = (estado.stats[j.id]?.linha || []).slice(-3);
+      return ult.length ? ult.filter(x => x.res === 'V').length / ult.length : 0.5;
+    };
+    const fQuente = (quente(a) + quente(b)) / 2;
+    return 0.15 * fProx + 0.40 * fClassico + 0.25 * fBrigado + 0.20 * fQuente;
+  };
+
   const montarPartida = (x, y) => {
     const desafiado = x.pos <= y.pos ? x : y;
     const desafiante = x.pos <= y.pos ? y : x;
@@ -858,6 +924,7 @@ function gerarConfra(presentesIds, estado, ladder, opts = {}) {
       aprovada: true,
       dif: Math.abs(x.rating - y.rating), gap,
       jaJogaram: h ? h.v + h.e + h.d : 0,
+      h2hPlacar: h ? `${h.v}-${h.e}-${h.d}` : null,
       odd_desafiado: calcOdd(desafiado.rating, desafiante.rating),
       odd_desafiante: calcOdd(desafiante.rating, desafiado.rating)
     };
@@ -920,16 +987,23 @@ function gerarConfra(presentesIds, estado, ladder, opts = {}) {
         // O #2 também guarda uma vaga: o duelo do cinturão é obrigatório.
         if (envolveSegundo && !ultima && jogosDe[segundo.id] >= jogosPorPessoa - 1) continue;
 
-        const nota = 0.50 * fEscada
-                   + 0.35 * fVizinho
+        const fEmocao = emocaoDe(a, b, fProx);
+        const fAcaso = acaso(chave(a.id, b.id) + '|' + r);
+
+        const nota = (P.escada ?? 0.50) * fEscada
+                   + (P.vizinho ?? 0.35) * fVizinho
                    + (ultima && envolveLider ? 0.80 : 0)
-                   + P.prox * fProx
-                   + P.desafio * (ehDesafio ? 1 : 0)
-                   + P.novidade * fNovidade
+                   + (P.prox ?? 0) * fProx
+                   + (P.desafio ?? 0) * (ehDesafio ? 1 : 0)
+                   + (P.novidade ?? 0) * fNovidade
+                   + (P.emocao ?? 0) * fEmocao
+                   + (P.acaso ?? 0) * fAcaso
+                   - (P.soDesafio && !ehDesafio ? 0.9 : 0)
                    + 0.18 * fRodizio
                    + 0.05 * (descansou ? 1 : 0);
 
-        pares.push({ a, b, nota, dif, gap, ehDesafio, desafiante, desafiado, jaJogaram });
+        pares.push({ a, b, nota, dif, gap, ehDesafio, desafiante, desafiado, jaJogaram,
+                     emocao: fEmocao });
       }
     }
 
@@ -977,13 +1051,7 @@ function gerarConfra(presentesIds, estado, ladder, opts = {}) {
       if (partidas.length >= mesas) break;
       escalar(par);
     }
-    // Só se a rodada ficaria completamente vazia é que o teto é relaxado.
-    if (!partidas.length) {
-      for (const par of [...pares.filter(inedito), ...pares]) {
-        if (partidas.length >= mesas) break;
-        escalar(par);
-      }
-    }
+    // Sem par à altura, a rodada não acontece. Antes menos jogos do que #1 contra #8.
 
     if (!partidas.length) break;
     // Dentro da rodada, a mesa 1 é sempre o confronto mais alto da tabela.
@@ -1925,13 +1993,24 @@ function viewAdm() {
         <input type="number" id="cf-mesas" min="1" max="6" value="${S.confraOpts?.mesas ?? 1}"></label>
       <label class="campo"><span>Jogos por pessoa</span>
         <input type="number" id="cf-jpp" min="1" max="10" value="${S.confraOpts?.jogosPorPessoa ?? 3}"></label>
-      <label class="campo"><span>Como montar</span>
-        <select id="cf-estilo">
-          ${Object.entries(ESTILOS_CONFRA).map(([k, v]) =>
-            `<option value="${k}" ${(S.confraOpts?.estilo ?? 'equilibrio') === k ? 'selected' : ''}>${esc(v.rotulo)}</option>`).join('')}
-        </select></label>
     </div>
-    <button class="btn p" id="cf-gerar">Gerar tabela</button>
+
+    <div class="campo"><span class="rot">Como montar a noite</span>
+      <div class="modos" id="cf-modos">
+        ${Object.entries(ESTILOS_CONFRA).map(([k, v]) => {
+          const [nome, desc] = v.rotulo.split(' — ');
+          return `<button type="button" data-modo="${k}"
+            class="${(S.confraOpts?.estilo ?? 'ranking') === k ? 'on' : ''}">
+            <b>${esc(nome)}</b><small>${esc(desc || '')}</small></button>`;
+        }).join('')}
+      </div>
+    </div>
+    <input type="hidden" id="cf-estilo" value="${esc(S.confraOpts?.estilo ?? 'ranking')}">
+
+    <div class="linha">
+      <button class="btn p" id="cf-gerar">Gerar tabela</button>
+      ${S.confra ? '<button class="btn" id="cf-outra">🎲 Gerar outra</button>' : ''}
+    </div>
     <div id="cf-saida">${S.confra ? tabelaConfra(S.confra) : ''}</div>
   </div>
 
@@ -2089,7 +2168,8 @@ function tabelaConfra(g) {
         return Object.entries(c).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
           .map(([n, v]) => `${esc(n)}: ${v}`).join(' · ');
       })()}<br>
-      <span style="color:var(--texto-fraco)">Desmarque o que não vai rolar antes de abrir.</span>
+      <span style="color:var(--texto-fraco)">Modo: ${esc((ESTILOS_CONFRA[S.confraOpts?.estilo]?.rotulo || '').split(' — ')[0])}
+      · desmarque o que não vai rolar antes de abrir · <b>🎲 Gerar outra</b> dá uma noite diferente.</span>
     </div></div>
     <div class="linha" style="margin:10px 0 4px">
       <button class="btn mini" id="cf-copiar">Copiar tabela</button>
@@ -2115,7 +2195,9 @@ function tabelaConfra(g) {
               <span style="color:var(--texto-fraco)">×</span>
               <b>#${p.desafiante.pos} ${esc(p.desafiante.nome)}</b></span>
             <span class="cf-info">${p.odd_desafiado.toFixed(2)} / ${p.odd_desafiante.toFixed(2)}
-              · dif ${p.dif} · ${p.jaJogaram ? p.jaJogaram + 'º confronto' : 'nunca se enfrentaram'}</span>
+              · dif ${p.dif} · ${p.jaJogaram
+                ? `${p.jaJogaram}º confronto${p.h2hPlacar ? ' (' + p.h2hPlacar + ')' : ''}`
+                : 'nunca se enfrentaram'}</span>
           </label>`).join('')}
       </div>`).join('')}`;
 }
@@ -2285,7 +2367,14 @@ function ligarEventos(raiz) {
     cxs().forEach(c => c.checked = false); S.confraPresentes = []; atualizaConta();
   });
 
-  raiz.querySelector('#cf-gerar')?.addEventListener('click', () => {
+  raiz.querySelector('#cf-modos')?.addEventListener('click', e => {
+    const b = e.target.closest('[data-modo]');
+    if (!b) return;
+    raiz.querySelectorAll('#cf-modos button').forEach(x => x.classList.toggle('on', x === b));
+    raiz.querySelector('#cf-estilo').value = b.dataset.modo;
+  });
+
+  const gerar = (novaSemente = false) => {
     const presentes = marcados();
     if (presentes.length < 2) return erro('Marque pelo menos dois presentes.');
     S.confraPresentes = presentes;
@@ -2293,12 +2382,26 @@ function ligarEventos(raiz) {
       mesas: Math.max(1, Number(raiz.querySelector('#cf-mesas').value) || 2),
       jogosPorPessoa: Math.max(1, Number(raiz.querySelector('#cf-jpp').value) || 3),
       estilo: raiz.querySelector('#cf-estilo').value,
-      alcance: Number(cfg('alcance_desafio', 2))
+      alcance: Number(cfg('alcance_desafio', 2)),
+      semente: novaSemente ? Math.floor(Math.random() * 1e9) : (S.confraOpts?.semente || 1)
     };
+    const impressao = t => JSON.stringify((t?.rodadas || []).map(r =>
+      r.partidas.map(x => [x.desafiado.id, x.desafiante.id].sort().join('|'))));
+    const anterior = impressao(S.confra);
+
     S.confra = gerarConfra(presentes, S.estado, S.ladder, S.confraOpts);
+    // "Gerar outra" tem de entregar algo diferente: tenta outras sementes.
+    if (novaSemente && anterior !== '[]') {
+      for (let i = 0; i < 8 && impressao(S.confra) === anterior; i++) {
+        S.confraOpts.semente = Math.floor(Math.random() * 1e9);
+        S.confra = gerarConfra(presentes, S.estado, S.ladder, S.confraOpts);
+      }
+    }
     render();
     bom(`${S.confra.rodadas.reduce((t, r) => t + r.partidas.length, 0)} partidas montadas.`);
-  });
+  };
+  raiz.querySelector('#cf-gerar')?.addEventListener('click', () => gerar(true));
+  raiz.querySelector('#cf-outra')?.addEventListener('click', () => gerar(true));
 
   raiz.querySelectorAll('.cf-ok').forEach(c => c.onchange = () => {
     const r = S.confra?.rodadas.find(x => x.n === Number(c.dataset.r));
