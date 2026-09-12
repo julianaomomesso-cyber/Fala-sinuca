@@ -420,6 +420,45 @@ div.campo { display: block; margin-bottom: 12px; }
 .modos button.on b { color: var(--ouro-claro); }
 .modos button small { font-size: 11.5px; color: var(--texto-fraco); line-height: 1.35; }
 
+/* ---------- Painel da noite ---------- */
+.pn-jogo {
+  border: 1px solid var(--borda); border-radius: 12px;
+  padding: 14px; margin-bottom: 12px; background: var(--painel-alto);
+}
+.pn-duelo { display: flex; align-items: center; gap: 12px; }
+.pn-lado {
+  flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
+  background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 10px; padding: 10px 12px;
+}
+.pn-lado > div { min-width: 0; flex: 1; }
+.pn-lado b { display: block; font-size: 14.5px; white-space: nowrap;
+             overflow: hidden; text-overflow: ellipsis; }
+.pn-lado small { display: block; font-size: 11.5px; color: var(--texto-fraco); }
+.pn-odd { font-size: 18px; font-weight: 800; color: var(--ouro-claro);
+          font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pn-x { color: var(--texto-fraco); font-weight: 800; flex: 0 0 auto; }
+
+.pn-barra { display: flex; height: 7px; border-radius: 99px; overflow: hidden;
+            background: var(--fundo); margin-top: 11px; }
+.pn-barra i { background: var(--ouro); }
+.pn-barra u { background: var(--azul); }
+.pn-fatia { display: flex; justify-content: space-between; font-size: 11.5px;
+            color: var(--texto-fraco); margin-top: 4px; }
+
+.pn-apostas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.pn-aposta {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--fundo); border: 1px solid var(--borda);
+  border-radius: 999px; padding: 4px 11px 4px 5px; font-size: 12.5px;
+}
+.pn-aposta b { font-weight: 650; }
+
+@media (max-width: 620px) {
+  .pn-duelo { flex-direction: column; align-items: stretch; gap: 8px; }
+  .pn-x { text-align: center; }
+}
+
 </style>
 </head>
 <body>
@@ -1054,16 +1093,15 @@ function gerarConfra(presentesIds, estado, ladder, opts = {}) {
     // Sem par à altura, a rodada não acontece. Antes menos jogos do que #1 contra #8.
 
     if (!partidas.length) break;
-    // Dentro da rodada, a mesa 1 é sempre o confronto mais alto da tabela.
-    partidas.sort((x, y) => Math.min(x.desafiado.pos, x.desafiante.pos)
-                          - Math.min(y.desafiado.pos, y.desafiante.pos));
+    // Dentro da rodada, a mesa 1 é o confronto mais BAIXO: a noite sobe sempre.
+    partidas.sort((x, y) => Math.max(y.desafiado.pos, y.desafiante.pos)
+                          - Math.max(x.desafiado.pos, x.desafiante.pos));
     partidas.forEach((x, i) => { x.mesa = i + 1; });
 
     rodadas.push({
       n: rodadas.length + 1,
       partidas,
-      temCinturao: partidas.some(x => x.peloCinturao),
-      folga: presentes.filter(j => !ocupados.has(j.id)).map(j => j.nome)
+      temCinturao: partidas.some(x => x.peloCinturao)
     });
   }
 
@@ -1072,8 +1110,7 @@ function gerarConfra(presentesIds, estado, ladder, opts = {}) {
     rodadas.push({
       n: rodadas.length + 1,
       partidas: [montarPartida(lider, segundo)],
-      temCinturao: true,
-      folga: presentes.filter(j => j.id !== lider.id && j.id !== segundo.id).map(j => j.nome)
+      temCinturao: true
     });
     jogosDe[lider.id]++; jogosDe[segundo.id]++;
   }
@@ -1142,7 +1179,7 @@ function modal(titulo, corpoHTML, aoAbrir) {
 let sb = null;
 const S = {
   jogadores: [], jogos: [], desafios: [], apostas: [], carteira: [], config: {},
-  eu: null, admin: false, aba: 'ranking',
+  eu: null, admin: false, aba: 'painel',
   estado: null, ladder: [], ranking: [], carregando: false
 };
 
@@ -1190,7 +1227,9 @@ async function rpc(nome, args) {
     const cru = error.message || '';
     // Erros típicos de banco desatualizado — vale explicar em vez de mostrar o texto do Postgres.
     if (/could not find the function|does not exist|schema cache/i.test(cru)) {
-      throw new Error('O banco ainda está na versão antiga. Rode o 1-banco.sql atualizado no Supabase.');
+      throw new Error('O Supabase não achou essa função. Se você JÁ rodou o 1-banco.sql: '
+        + 'vá em Settings → API → Reload schema cache (ou espere 1 minuto) e tente de novo. '
+        + 'Se ainda não rodou, rode o 1-banco.sql atualizado.');
     }
     throw new Error(cru.replace(/^.*?:\s*/, '') || 'Erro no servidor');
   }
@@ -1327,8 +1366,8 @@ function loginAdmin() {
 
 /* ---------------------------------------------------------------- render */
 const ABAS = [
-  ['ranking', 'Ranking'], ['ladder', 'Ladder'], ['jogos', 'Jogos'],
-  ['carteira', 'Carteira'], ['perfil', 'Perfil']
+  ['painel', 'Painel'], ['ranking', 'Ranking'], ['ladder', 'Ladder'],
+  ['jogos', 'Jogos'], ['carteira', 'Carteira'], ['perfil', 'Perfil']
 ];
 
 function render() {
@@ -1348,7 +1387,7 @@ function render() {
 
   const abas = [...ABAS];
   if (S.admin) abas.push(['adm', '🔒 ADM']);
-  if (!abas.some(a => a[0] === S.aba)) S.aba = 'ranking';
+  if (!abas.some(a => a[0] === S.aba)) S.aba = 'painel';
   $('#nav').innerHTML = abas.map(([k, n]) =>
     `<button data-aba="${k}" class="${k === 'adm' ? 'adm ' : ''}${S.aba === k ? 'on' : ''}">${esc(n)}</button>`
   ).join('');
@@ -1359,9 +1398,9 @@ function render() {
 
   const alvo = $('#conteudo');
   alvo.innerHTML = ({
-    ranking: viewRanking, ladder: viewLadder, jogos: viewJogos,
+    painel: viewPainel, ranking: viewRanking, ladder: viewLadder, jogos: viewJogos,
     carteira: viewCarteira, perfil: viewPerfil, adm: viewAdm
-  }[S.aba] || viewRanking)();
+  }[S.aba] || viewPainel)();
   ligarEventos(alvo);
 }
 
@@ -1429,6 +1468,12 @@ const vazio = (ic, txt) => `<div class="vazio"><span class="ic">${ic}</span>${es
 /** Quem está no #1 do ladder é o dono do cinturão. */
 const campeao = () => S.ladder[0] || null;
 
+/** Posição mais baixa envolvida num confronto (serve para ordenar de baixo pra cima). */
+const alturaDe = d => Math.max(
+  S.ladder.find(x => x.id === d.desafiado_id)?.pos ?? 0,
+  S.ladder.find(x => x.id === d.desafiante_id)?.pos ?? 0);
+const deBaixoPraCima = (a, b) => alturaDe(b) - alturaDe(a);
+
 /** 🏆 ×N — cinturões já conquistados (o admin lança na mão). */
 function cintHTML(j, tam = 13) {
   const n = j?.cinturoes || 0;
@@ -1449,6 +1494,119 @@ function faixaCampeao() {
       <small>#1 do ladder · rating ${c.rating}${c.cinturoes ? ` · ${c.cinturoes}º título` : ''}</small>
     </div>
     ${souEu ? '<div class="cint-voce">é você</div>' : ''}
+  </div>`;
+}
+
+/* ------------------------------------------------------------ PAINEL
+   O resumo da noite: o que está rolando agora, quem apostou no quê,
+   o que acabou de acontecer e como o ladder mexeu.
+   ------------------------------------------------------------ */
+function viewPainel() {
+  const abertos = S.desafios.filter(d => d.status === 'aberto');
+  const apAbertas = S.apostas.filter(a => a.status === 'aberta');
+  const naMesa = apAbertas.reduce((t, a) => t + a.moedas, 0);
+  const det = [...S.estado.detalhes].reverse();
+  const recentes = det.filter(g => g.tipo !== 'historico').slice(0, 8);
+  const hoje = hojeISO();
+  const doDia = det.filter(g => g.data === hoje && g.tipo !== 'historico');
+
+  /* --- um jogo em aberto, com as apostas em cima dele --- */
+  const cartaoAberto = d => {
+    const A = jogDe(d.desafiado_id), B = jogDe(d.desafiante_id);
+    if (!A || !B) return '';
+    const aps = apAbertas.filter(a => a.desafio_id === d.id);
+    const porLado = id => aps.filter(a => a.em_id === id);
+    const soma = id => porLado(id).reduce((t, a) => t + a.moedas, 0);
+    const total = soma(A.id) + soma(B.id);
+    const fatia = id => total ? Math.round(soma(id) / total * 100) : 50;
+
+    const lado = j => `<div class="pn-lado">
+      ${avatar(j, 38)}
+      <div>
+        <b>${esc(j.nome)}</b>
+        <small>#${S.ladder.find(x => x.id === j.id)?.pos ?? '?'} · ${S.estado.rating[j.id]}</small>
+      </div>
+      <span class="pn-odd">${calcOdd(S.estado.rating[j.id],
+        S.estado.rating[j.id === A.id ? B.id : A.id]).toFixed(2)}×</span>
+    </div>`;
+
+    return `<div class="pn-jogo">
+      <div class="linha" style="margin-bottom:10px">
+        <span class="tag ${d.tipo === 'amistoso' ? 't-azul' : 't-ouro'}">
+          ${d.tipo === 'amistoso' ? 'amistoso' : 'vale posição'}</span>
+        ${aps.length ? `<span class="tag t-cinza">${aps.length} aposta(s) · ${nf(total)} 🪙</span>`
+                     : '<span class="tag t-cinza">ninguém apostou ainda</span>'}
+      </div>
+      <div class="pn-duelo">${lado(A)}<span class="pn-x">×</span>${lado(B)}</div>
+      ${total ? `<div class="pn-barra">
+        <i style="width:${fatia(A.id)}%"></i><u style="width:${fatia(B.id)}%"></u></div>
+        <div class="pn-fatia"><span>${fatia(A.id)}% em ${esc(A.nome)}</span>
+        <span>${fatia(B.id)}% em ${esc(B.nome)}</span></div>` : ''}
+      ${aps.length ? `<div class="pn-apostas">${aps.map(a => `
+        <span class="pn-aposta">${avatar(jogDe(a.apostador_id), 18)}
+          <b>${esc(nomeDe(a.apostador_id))}</b> ${nf(a.moedas)}🪙 em
+          ${esc(nomeDe(a.em_id))} @ ${Number(a.odd).toFixed(2)}</span>`).join('')}</div>` : ''}
+    </div>`;
+  };
+
+  return `
+  ${faixaCampeao()}
+
+  <div class="card">
+    <div class="grade g3">
+      <div class="kpi"><span>Jogos em aberto</span><b>${abertos.length}</b></div>
+      <div class="kpi"><span>Na mesa</span><b style="color:var(--ouro-claro)">🪙 ${nf(naMesa)}</b></div>
+      <div class="kpi"><span>Partidas hoje</span><b>${doDia.length}</b></div>
+      <div class="kpi"><span>Membros</span><b>${S.jogadores.filter(j => j.ativo).length}</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Rolando agora</h2>
+    <p class="sub">Os jogos marcados e onde o dinheiro está.</p>
+    ${abertos.length ? [...abertos].sort(deBaixoPraCima).map(cartaoAberto).join('')
+      : vazio('🎱', 'Nenhum jogo marcado. O ladder está parado.')}
+  </div>
+
+  <div class="card">
+    <h2>Últimos resultados</h2>
+    ${recentes.length ? `<div class="tab-rolagem"><table>
+      <thead><tr><th>Quando</th><th>Partida</th><th>Δ rating</th><th></th></tr></thead>
+      <tbody>${recentes.map(g => `<tr>
+        <td style="color:var(--texto-fraco);white-space:nowrap">${dataBR(g.data)}</td>
+        <td>${g.vencedor_id
+          ? `<b>${esc(nomeDe(g.vencedor_id))}</b> <span style="color:var(--texto-fraco)">venceu</span>
+             ${esc(nomeDe(g.vencedor_id === g.desafiado_id ? g.desafiante_id : g.desafiado_id))}`
+          : `${esc(nomeDe(g.desafiado_id))} <span style="color:var(--texto-fraco)">×</span> ${esc(nomeDe(g.desafiante_id))}`}</td>
+        <td class="num" style="white-space:nowrap">${g.delta_def || g.delta_chal
+          ? `<span style="color:${g.delta_def >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${g.delta_def > 0 ? '+' : ''}${g.delta_def}</span>
+             <span style="color:var(--texto-fraco)">/</span>
+             <span style="color:${g.delta_chal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${g.delta_chal > 0 ? '+' : ''}${g.delta_chal}</span>`
+          : '<span style="color:var(--texto-fraco)">—</span>'}</td>
+        <td>${g.zebra ? '<span class="tag t-ouro">zebra</span>' : ''}
+            ${g.trocou ? '<span class="tag t-verde">trocou posição</span>' : ''}
+            ${g.vencedor_id === null ? '<span class="tag t-cinza">empate</span>' : ''}</td>
+      </tr>`).join('')}</tbody></table></div>` : vazio('📋', 'Nenhuma partida ainda.')}
+  </div>
+
+  <div class="card">
+    <h2>Bolso do pessoal</h2>
+    <p class="sub">Saldo de moedas e quem está em alta nas apostas.</p>
+    <div class="tab-rolagem"><table>
+      <thead><tr><th>Membro</th><th class="num">Saldo</th><th class="num">Em jogo</th>
+        <th class="num esconde-mob">Lucro</th></tr></thead>
+      <tbody>${S.jogadores.filter(j => j.ativo)
+        .map(j => ({ j, saldo: saldoAtual(j.id), fs: falaScoreApostador(j.id, S.apostas),
+                     jogando: apAbertas.filter(a => a.apostador_id === j.id).reduce((t, a) => t + a.moedas, 0) }))
+        .sort((a, b) => b.saldo - a.saldo)
+        .map(x => `<tr class="${x.j.id === S.eu ? 'destaque' : ''}">
+          <td>${celJogador(x.j)}</td>
+          <td class="num" style="color:var(--ouro-claro)">🪙 ${nf(x.saldo)}</td>
+          <td class="num">${x.jogando ? nf(x.jogando) : '—'}</td>
+          <td class="num esconde-mob" style="color:${x.fs.lucro >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">
+            ${x.fs.semDados ? '—' : (x.fs.lucro >= 0 ? '+' : '') + nf(x.fs.lucro)}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>
   </div>`;
 }
 
@@ -1580,7 +1738,7 @@ function viewLadder() {
    embaixo o histórico completo de partidas.
    ------------------------------------------------------------ */
 function secaoMarcados() {
-  const abertos = S.desafios.filter(d => d.status === 'aberto');
+  const abertos = S.desafios.filter(d => d.status === 'aberto').sort(deBaixoPraCima);
   const permitePropria = cfg('aposta_propria', false);
 
   const cartao = d => {
@@ -1918,7 +2076,7 @@ function viewPerfil() {
 /* ------------------------------------------------------------ ADM */
 function viewAdm() {
   if (!S.admin) return `<div class="card">${vazio('🔒', 'Área restrita.')}</div>`;
-  const abertos = S.desafios.filter(d => d.status === 'aberto');
+  const abertos = S.desafios.filter(d => d.status === 'aberto').sort(deBaixoPraCima);
   const optJog = (sel = '') => S.jogadores.filter(j => j.ativo)
     .map(j => `<option value="${esc(j.id)}" ${j.id === sel ? 'selected' : ''}>${esc(j.nome)}</option>`).join('');
   const aud = S.auditoria || [];
@@ -1936,7 +2094,12 @@ function viewAdm() {
 
   <div class="card">
     <h2>Lançar resultado</h2>
-    <p class="sub">Ao salvar, o rating e o ladder se atualizam e as apostas são pagas na hora. Amistoso já vem marcado como "vale só rating" — não precisa trocar.</p>
+    <p class="sub">Escolha o vencedor de cada jogo e salve — um por um ou todos de uma vez.
+      Não precisa encerrar em ordem. Amistoso já vem como "vale só rating".</p>
+    ${abertos.length > 1 ? `<div class="linha" style="margin-bottom:12px">
+      <button class="btn p" id="btn-salvar-todos">Salvar todos os preenchidos</button>
+      <span style="color:var(--texto-fraco);font-size:12.5px">
+        só entram os jogos em que você escolheu o vencedor</span></div>` : ''}
     ${abertos.length ? abertos.map(d => {
       const am = d.tipo === 'amistoso';
       return `
@@ -1951,8 +2114,9 @@ function viewAdm() {
         </div>
         <div class="linha">
           <select data-venc="${esc(d.id)}" style="flex:1;min-width:160px">
-            <option value="${esc(d.desafiado_id)}">Venceu: ${esc(nomeDe(d.desafiado_id))}</option>
-            <option value="${esc(d.desafiante_id)}">Venceu: ${esc(nomeDe(d.desafiante_id))}</option>
+            <option value="?" selected>— quem venceu?</option>
+            <option value="${esc(d.desafiado_id)}">${esc(nomeDe(d.desafiado_id))} venceu</option>
+            <option value="${esc(d.desafiante_id)}">${esc(nomeDe(d.desafiante_id))} venceu</option>
             <option value="">Empate</option>
           </select>
           <select data-tipo="${esc(d.id)}" style="flex:1;min-width:170px">
@@ -2181,7 +2345,6 @@ function tabelaConfra(g) {
         <div class="rodada-topo">
           <b>Rodada ${r.n}</b>
           ${r.n === g.rodadas.length ? '<span class="tag t-ouro">🏆 decisão do cinturão</span>' : ''}
-          ${r.folga.length ? `<span style="color:var(--texto-fraco);font-size:12.5px">folga: ${esc(r.folga.join(', '))}</span>` : ''}
           <button class="btn mini ok" data-abrir-rodada="${r.n}" style="margin-left:auto"
             ${r.partidas.some(p => p.aprovada) ? '' : 'disabled'}>Abrir no app</button>
         </div>
@@ -2213,7 +2376,6 @@ function textoConfra(g) {
       `  Mesa ${p.mesa}: ${p.desafiado.nome} (#${p.desafiado.pos}) x ${p.desafiante.nome} (#${p.desafiante.pos})` +
       (p.tipo === 'desafio' ? '  — vale posição' : '  — amistoso') +
       (p.peloCinturao ? '  🏆' : '')));
-    if (r.folga.length) linhas.push(`  _folga: ${r.folga.join(', ')}_`);
     linhas.push('');
   });
   linhas.push('Apostas abertas no app 🪙');
@@ -2248,16 +2410,40 @@ function ligarEventos(raiz) {
 
   raiz.querySelectorAll('[data-salvar-res]').forEach(b => b.onclick = async () => {
     const id = b.dataset.salvarRes;
-    const venc = raiz.querySelector(`[data-venc="${CSS.escape(id)}"]`).value || null;
+    const bruto = raiz.querySelector(`[data-venc="${CSS.escape(id)}"]`).value;
+    if (bruto === '?') return erro('Escolha quem venceu antes de salvar.');
     const tipo = raiz.querySelector(`[data-tipo="${CSS.escape(id)}"]`).value;
     const data = raiz.querySelector(`[data-data="${CSS.escape(id)}"]`).value || hojeISO();
     b.disabled = true; b.textContent = 'Salvando…';
     try {
       await rpc('fs_registrar_resultado',
-        { p_desafio: id, p_vencedor: venc, p_tipo: tipo, p_data: data });
+        { p_desafio: id, p_vencedor: bruto || null, p_tipo: tipo, p_data: data });
       bom('Resultado lançado e apostas pagas.');
       await recarregar();
     } catch (e) { erro(e.message); b.disabled = false; b.textContent = 'Salvar'; }
+  });
+
+  raiz.querySelector('#btn-salvar-todos')?.addEventListener('click', async e => {
+    const prontos = [...raiz.querySelectorAll('[data-venc]')]
+      .filter(sel => sel.value !== '?')
+      .map(sel => sel.dataset.venc);
+    if (!prontos.length) return erro('Escolha o vencedor de pelo menos um jogo.');
+    if (!confirm(`Lançar o resultado de ${prontos.length} jogo(s) de uma vez?`)) return;
+    e.target.disabled = true; e.target.textContent = 'Salvando…';
+    let ok = 0; const falhas = [];
+    for (const id of prontos) {
+      const venc = raiz.querySelector(`[data-venc="${CSS.escape(id)}"]`).value;
+      const tipo = raiz.querySelector(`[data-tipo="${CSS.escape(id)}"]`).value;
+      const data = raiz.querySelector(`[data-data="${CSS.escape(id)}"]`).value || hojeISO();
+      try {
+        await rpc('fs_registrar_resultado',
+          { p_desafio: id, p_vencedor: venc || null, p_tipo: tipo, p_data: data });
+        ok++;
+      } catch (er) { falhas.push(er.message); }
+    }
+    if (ok) bom(`${ok} resultado(s) lançados e apostas pagas.`);
+    if (falhas.length) erro(falhas[0]);
+    await recarregar();
   });
 
   raiz.querySelector('#btn-av-salvar')?.addEventListener('click', async e => {
