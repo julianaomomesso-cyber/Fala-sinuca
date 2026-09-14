@@ -459,6 +459,47 @@ div.campo { display: block; margin-bottom: 12px; }
   .pn-x { text-align: center; }
 }
 
+/* ---------- Modo Mesa (tablet) ---------- */
+.mesa {
+  background: var(--painel); border: 1px solid var(--borda);
+  border-radius: var(--raio); padding: 18px; margin: 14px 0;
+}
+.mesa.on { border-color: rgba(212,160,60,.5);
+           background: linear-gradient(180deg, rgba(212,160,60,.07), transparent 55%); }
+.mesa-topo { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 16px; }
+.mesa-crono {
+  font-size: 26px; font-weight: 800; color: var(--ouro-claro);
+  font-variant-numeric: tabular-nums; letter-spacing: 1px;
+}
+.mesa-crono.longo { color: var(--laranja); }
+
+.mesa-duelo { display: flex; align-items: stretch; gap: 14px; }
+.mesa-jog {
+  flex: 1; display: grid; justify-items: center; gap: 3px;
+  background: var(--painel-alto); border: 2px solid var(--borda-forte);
+  border-radius: 14px; padding: 20px 12px; transition: .13s; min-width: 0;
+}
+.mesa-jog:hover:not(:disabled) { border-color: var(--verde); background: rgba(63,185,80,.12); }
+.mesa-jog:active:not(:disabled) { transform: scale(.98); }
+.mesa-jog:disabled { opacity: .5; cursor: default; }
+.mesa-jog b { font-size: 20px; font-weight: 800; margin-top: 6px; }
+.mesa-jog small { font-size: 12.5px; color: var(--texto-fraco); }
+.mesa-venceu {
+  margin-top: 9px; font-size: 11px; font-weight: 800; letter-spacing: 1.4px;
+  text-transform: uppercase; color: var(--verde);
+  border: 1px solid rgba(63,185,80,.4); border-radius: 999px; padding: 4px 14px;
+}
+.mesa-jog:disabled .mesa-venceu { color: var(--texto-fraco); border-color: var(--borda); }
+.mesa-x { display: grid; place-items: center; color: var(--texto-fraco);
+          font-weight: 800; font-size: 19px; }
+.mesa-start { font-size: 17px; padding: 14px 32px; border-radius: 12px; }
+
+@media (max-width: 620px) {
+  .mesa-jog { padding: 15px 8px; }
+  .mesa-jog b { font-size: 17px; }
+  .mesa-crono { font-size: 22px; }
+}
+
 </style>
 </head>
 <body>
@@ -1386,7 +1427,7 @@ function render() {
        border-color:${fs.faixa.cor}55">${fs.score}</span>` : ''}` : '';
 
   const abas = [...ABAS];
-  if (S.admin) abas.push(['adm', '🔒 ADM']);
+  if (S.admin) abas.push(['mesa', '🎱 Mesa'], ['adm', '🔒 ADM']);
   if (!abas.some(a => a[0] === S.aba)) S.aba = 'painel';
   $('#nav').innerHTML = abas.map(([k, n]) =>
     `<button data-aba="${k}" class="${k === 'adm' ? 'adm ' : ''}${S.aba === k ? 'on' : ''}">${esc(n)}</button>`
@@ -1399,7 +1440,7 @@ function render() {
   const alvo = $('#conteudo');
   alvo.innerHTML = ({
     painel: viewPainel, ranking: viewRanking, ladder: viewLadder, jogos: viewJogos,
-    carteira: viewCarteira, perfil: viewPerfil, adm: viewAdm
+    carteira: viewCarteira, perfil: viewPerfil, mesa: viewMesa, adm: viewAdm
   }[S.aba] || viewPainel)();
   ligarEventos(alvo);
 }
@@ -1773,7 +1814,9 @@ function secaoMarcados() {
               ? `#${S.ladder.find(x => x.id === B.id)?.pos ?? '?'} chamou #${S.ladder.find(x => x.id === A.id)?.pos ?? '?'}`
               : `#${S.ladder.find(x => x.id === B.id)?.pos ?? '?'} desafiou #${S.ladder.find(x => x.id === A.id)?.pos ?? '?'}`}
             · ${dataBR(d.criado_em?.slice(0, 10))}</span></div>
-        ${d.desafiante_id === S.eu && !total.length
+        ${S.admin
+          ? `<button class="btn mini perigo" data-cancelar-mesa="${esc(d.id)}">Cancelar</button>`
+          : d.desafiante_id === S.eu && !total.length
           ? `<button class="btn mini perigo" data-cancelar="${esc(d.id)}">Cancelar</button>` : ''}
       </div>
       <div class="linha" style="gap:11px;flex-wrap:nowrap;align-items:stretch">
@@ -1865,6 +1908,7 @@ function secaoHistorico() {
                <span style="color:${g.delta_chal >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${g.delta_chal > 0 ? '+' : ''}${g.delta_chal}</span>`
             : '<span style="color:var(--texto-fraco)">—</span>'}</td>
         <td>${rotulo[g.tipo] || ''}${g.trocou ? '<span class="tag t-ouro">trocou posição</span>' : ''}
+          ${g.duracao_seg ? `<span class="tag t-cinza">⏱ ${mmss(g.duracao_seg)}</span>` : ''}
           ${g.lancado_por ? `<span class="tag t-cinza">lançado por ${esc(nomeDe(g.lancado_por))}</span>` : ''}
           ${S.admin ? `<button class="btn mini perigo" data-apagar-jogo="${esc(g.id)}"
             style="margin-left:6px">apagar</button>` : ''}</td>
@@ -2073,6 +2117,78 @@ function viewPerfil() {
   </div>`;
 }
 
+/* ------------------------------------------------------------ MESA
+   A tela do tablet ao lado da mesa. Botões grandes: dá o start, o cronômetro
+   roda, e no fim é só tocar em quem venceu. Só o admin enxerga.
+   ------------------------------------------------------------ */
+const mmss = seg => {
+  if (seg == null) return '';
+  const m = Math.floor(seg / 60), x = seg % 60;
+  return `${m}:${String(x).padStart(2, '0')}`;
+};
+
+function viewMesa() {
+  if (!S.admin) return `<div class="card">${vazio('🔒', 'Área restrita.')}</div>`;
+  const abertos = S.desafios.filter(d => d.status === 'aberto').sort(deBaixoPraCima);
+  const rodando = abertos.filter(d => d.iniciado_em);
+  const naFila = abertos.filter(d => !d.iniciado_em);
+
+  const mesa = d => {
+    const A = jogDe(d.desafiado_id), B = jogDe(d.desafiante_id);
+    if (!A || !B) return '';
+    const aps = S.apostas.filter(a => a.desafio_id === d.id && a.status === 'aberta');
+    const bolo = aps.reduce((t, a) => t + a.moedas, 0);
+    const ativo = !!d.iniciado_em;
+
+    const lado = j => `<button class="mesa-jog" data-venceu-mesa="${esc(d.id)}" data-quem="${esc(j.id)}"
+        ${ativo ? '' : 'disabled'}>
+        ${avatar(j, 58)}
+        <b>${esc(j.nome)}</b>
+        <small>#${S.ladder.find(x => x.id === j.id)?.pos ?? '?'} · ${S.estado.rating[j.id]}</small>
+        <span class="mesa-venceu">${ativo ? 'venceu' : '—'}</span>
+      </button>`;
+
+    return `<div class="mesa ${ativo ? 'on' : ''}">
+      <div class="mesa-topo">
+        <span class="tag ${d.tipo === 'amistoso' ? 't-azul' : 't-ouro'}">
+          ${d.tipo === 'amistoso' ? 'amistoso' : 'vale posição'}</span>
+        ${bolo ? `<span class="tag t-cinza">${aps.length} aposta(s) · ${nf(bolo)} 🪙</span>` : ''}
+        ${ativo ? `<span class="mesa-crono" data-desde="${esc(d.iniciado_em)}">0:00</span>` : ''}
+        <button class="btn mini perigo" data-cancelar-mesa="${esc(d.id)}"
+          style="margin-left:auto">Cancelar jogo</button>
+      </div>
+
+      <div class="mesa-duelo">${lado(A)}<span class="mesa-x">×</span>${lado(B)}</div>
+
+      <div class="linha" style="margin-top:12px;justify-content:center">
+        ${ativo
+          ? `<button class="btn mini" data-zerar="${esc(d.id)}">Zerar cronômetro</button>
+             <button class="btn mini" data-venceu-mesa="${esc(d.id)}" data-quem="">Deu empate</button>`
+          : `<button class="btn p mesa-start" data-iniciar="${esc(d.id)}">▶ Começar a partida</button>`}
+      </div>
+    </div>`;
+  };
+
+  return `
+  <div class="card">
+    <h2>🎱 Modo Mesa</h2>
+    <p class="sub">Deixe esta tela aberta no tablet ao lado da mesa. Toque em
+      <b>Começar a partida</b> quando eles quebrarem, e no nome de quem venceu quando acabar —
+      o rating, o ladder e as apostas resolvem sozinhos.</p>
+    <div class="linha">
+      <label class="linha" style="gap:7px;cursor:pointer;font-size:13.5px">
+        <input type="checkbox" id="mesa-acordado" style="width:auto;margin:0;accent-color:var(--ouro)">
+        Manter a tela acesa
+      </label>
+    </div>
+  </div>
+
+  ${rodando.length ? `<h3>Rolando agora</h3>${rodando.map(mesa).join('')}` : ''}
+  ${naFila.length ? `<h3>Na fila</h3>${naFila.map(mesa).join('')}` : ''}
+  ${!abertos.length ? `<div class="card">${vazio('🎱',
+      'Nenhum jogo marcado. Gere a tabela na aba ADM ou espere o pessoal desafiar.')}</div>` : ''}`;
+}
+
 /* ------------------------------------------------------------ ADM */
 function viewAdm() {
   if (!S.admin) return `<div class="card">${vazio('🔒', 'Área restrita.')}</div>`;
@@ -2126,6 +2242,7 @@ function viewAdm() {
           </select>
           <input type="date" data-data="${esc(d.id)}" value="${hojeISO()}" style="width:auto">
           <button class="btn p mini" data-salvar-res="${esc(d.id)}">Salvar</button>
+          <button class="btn mini perigo" data-cancelar-mesa="${esc(d.id)}">Cancelar</button>
         </div>
       </div>`; }).join('')
       : vazio('🥊', 'Nenhum jogo marcado no momento.')}
@@ -2396,6 +2513,25 @@ function ligarEventos(raiz) {
     b.onclick = () => apagarJogo(b.dataset.apagarJogo));
   raiz.querySelectorAll('[data-venceu]').forEach(b =>
     b.onclick = () => lancarVencedor(b.dataset.venceu, b.dataset.quem || null));
+  raiz.querySelectorAll('[data-cancelar-mesa]').forEach(b =>
+    b.onclick = () => cancelarComoAdmin(b.dataset.cancelarMesa));
+
+  if (S.admin) {
+    raiz.querySelectorAll('[data-iniciar]').forEach(b => b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Começando…';
+      try { await rpc('fs_iniciar_jogo', { p_desafio: b.dataset.iniciar }); await recarregar(); }
+      catch (e) { erro(e.message); b.disabled = false; b.textContent = '▶ Começar a partida'; }
+    });
+    raiz.querySelectorAll('[data-zerar]').forEach(b => b.onclick = async () => {
+      if (!confirm('Zerar o cronômetro e voltar este jogo para a fila?')) return;
+      try { await rpc('fs_zerar_cronometro', { p_desafio: b.dataset.zerar }); await recarregar(); }
+      catch (e) { erro(e.message); }
+    });
+    raiz.querySelectorAll('[data-venceu-mesa]').forEach(b => b.onclick = () =>
+      encerrarNaMesa(b.dataset.venceuMesa, b.dataset.quem || null));
+    tocarCronometros(raiz);
+    ligarTelaAcesa(raiz);
+  }
 
   const sel = raiz.querySelector('#sel-perfil');
   if (sel) sel.onchange = () => { S.perfilId = sel.value; render(); };
@@ -2910,6 +3046,106 @@ function abrirPersonalizar() {
             { p_jogador: S.eu, p_emoji: novoEmoji, p_foto: novaFoto });
           fechar(); bom('Perfil atualizado.'); await recarregar();
         } catch (er) { erro(er.message); e.target.disabled = false; e.target.textContent = 'Salvar'; }
+      };
+    });
+}
+
+/* ---------- cronômetro da mesa ---------- */
+function tocarCronometros(raiz) {
+  clearInterval(window.__fsCrono);
+  const alvos = [...raiz.querySelectorAll('.mesa-crono')];
+  if (!alvos.length) return;
+  const pinta = () => alvos.forEach(el => {
+    const seg = Math.max(0, Math.floor((Date.now() - new Date(el.dataset.desde)) / 1000));
+    el.textContent = mmss(seg);
+    el.classList.toggle('longo', seg >= 900);          // 15 min
+  });
+  pinta();
+  window.__fsCrono = setInterval(pinta, 1000);
+}
+
+/** Mantém a tela do tablet acesa enquanto a aba Mesa está aberta. */
+async function ligarTelaAcesa(raiz) {
+  const cx = raiz.querySelector('#mesa-acordado');
+  if (!cx || !('wakeLock' in navigator)) {
+    if (cx) { cx.disabled = true; cx.parentElement.style.opacity = '.5'; }
+    return;
+  }
+  cx.checked = !!window.__fsWake;
+  cx.onchange = async () => {
+    try {
+      if (cx.checked) { window.__fsWake = await navigator.wakeLock.request('screen'); }
+      else { await window.__fsWake?.release(); window.__fsWake = null; }
+    } catch { erro('Este navegador não deixou manter a tela acesa.'); cx.checked = false; }
+  };
+}
+
+/** Encerra a partida direto da mesa, com confirmação grande. */
+function encerrarNaMesa(desafioId, vencedorId) {
+  const d = S.desafios.find(x => x.id === desafioId);
+  if (!d) return;
+  const seg = d.iniciado_em
+    ? Math.max(1, Math.floor((Date.now() - new Date(d.iniciado_em)) / 1000)) : null;
+  const texto = vencedorId ? `${nomeDe(vencedorId)} venceu` : 'Empate';
+  const aps = S.apostas.filter(a => a.desafio_id === desafioId && a.status === 'aberta');
+
+  modal('Encerrar a partida', `
+    <p style="text-align:center;font-size:15px;margin:0 0 6px;color:var(--texto-fraco)">
+      ${esc(nomeDe(d.desafiado_id))} × ${esc(nomeDe(d.desafiante_id))}</p>
+    <p style="text-align:center;font-size:25px;font-weight:800;color:var(--ouro-claro);margin:0 0 4px">
+      ${esc(texto)}</p>
+    ${seg ? `<p style="text-align:center;color:var(--texto-fraco);margin:0 0 14px">
+      duração: ${mmss(seg)}</p>` : '<div style="height:12px"></div>'}
+    ${aps.length ? `<div class="aviso info"><div>${aps.length} aposta(s) serão pagas agora.</div></div>` : ''}
+    <div class="linha" style="justify-content:center;gap:12px">
+      <button class="btn" data-x style="min-width:120px">Voltar</button>
+      <button class="btn p" data-ok style="min-width:140px">Confirmar</button></div>`,
+    (f, fechar) => {
+      f.querySelector('[data-x]').onclick = fechar;
+      f.querySelector('[data-ok]').onclick = async e => {
+        e.target.disabled = true; e.target.textContent = 'Salvando…';
+        try {
+          await rpc('fs_registrar_resultado', {
+            p_desafio: desafioId, p_vencedor: vencedorId,
+            p_tipo: d.tipo === 'amistoso' ? 'so_rating' : 'normal', p_data: hojeISO()
+          });
+          fechar(); bom('Partida encerrada.'); await recarregar();
+        } catch (er) { erro(er.message); e.target.disabled = false; e.target.textContent = 'Confirmar'; }
+      };
+    });
+}
+
+/** Cancela um jogo marcado e devolve as moedas de quem apostou. */
+function cancelarComoAdmin(desafioId) {
+  const d = S.desafios.find(x => x.id === desafioId);
+  if (!d) return;
+  const aps = S.apostas.filter(a => a.desafio_id === desafioId && a.status === 'aberta');
+  const bolo = aps.reduce((t, a) => t + a.moedas, 0);
+
+  modal('Cancelar este jogo', `
+    <p style="font-size:15px;line-height:1.6">
+      <b>${esc(nomeDe(d.desafiado_id))}</b> × <b>${esc(nomeDe(d.desafiante_id))}</b></p>
+    <div class="aviso alerta"><div>
+      O jogo sai da lista e ninguém ganha nem perde rating.
+      ${aps.length ? `As <b>${aps.length} aposta(s)</b> são canceladas e as
+        <b>${nf(bolo)} moedas</b> voltam para quem apostou.` : 'Não há apostas nele.'}
+    </div></div>
+    <label class="campo"><span>Motivo (opcional)</span>
+      <input type="text" id="cc-motivo" placeholder="Ex.: o cara foi embora"></label>
+    <div class="linha" style="justify-content:flex-end">
+      <button class="btn" data-x>Voltar</button>
+      <button class="btn perigo" data-ok>Cancelar o jogo</button></div>`,
+    (f, fechar) => {
+      f.querySelector('[data-x]').onclick = fechar;
+      f.querySelector('[data-ok]').onclick = async e => {
+        e.target.disabled = true; e.target.textContent = 'Cancelando…';
+        try {
+          const n = await rpc('fs_cancelar_desafio_admin',
+            { p_desafio: desafioId, p_motivo: f.querySelector('#cc-motivo').value || null });
+          fechar();
+          bom(n ? `Jogo cancelado e ${n} aposta(s) devolvidas.` : 'Jogo cancelado.');
+          await recarregar();
+        } catch (er) { erro(er.message); e.target.disabled = false; e.target.textContent = 'Cancelar o jogo'; }
       };
     });
 }

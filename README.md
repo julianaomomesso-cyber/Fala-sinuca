@@ -115,6 +115,9 @@ rating, apagar jogo ou ler a auditoria recebe `permission denied` em todos os ca
 
 ## As abas
 
+- **Painel** — o resumo da noite, e a primeira tela que abre. Os jogos rolando agora com
+  as odds e **quem apostou no quê**, quanto de moeda está na mesa, os últimos resultados
+  com o Δ rating, e o saldo de todo mundo.
 - **Ranking** — rating, V/E/D, pontos, forma dos últimos 5 jogos e o Fala Score.
   No topo, a faixa dourada do **cinturão atual**. Embaixo, o ranking dos apostadores por lucro.
 - **Ladder** — a escada. *Desafiar* em quem está ao alcance, *Amistoso* em todo o resto.
@@ -124,6 +127,7 @@ rating, apagar jogo ou ler a auditoria recebe `permission denied` em todos os ca
 - **Carteira** — saldo, extrato e o Fala Score de apostador.
 - **Perfil** — foto, cinturões conquistados, Fala Score detalhado, evolução do rating e
   confrontos diretos (H2H). É aqui que cada um se personaliza.
+- **🎱 Mesa** — só você. A tela do tablet ao lado da mesa (veja abaixo).
 - **🔒 ADM** — só você. Lançar resultado, gerador de jogos do confra, moedas, jogadores,
   configurações, auditoria e o botão de **baixar backup em JSON**.
 
@@ -159,6 +163,38 @@ só na etiqueta e na estatística de "zebras dadas"; a troca de pontos do rating
 Rating e posição **não ficam salvos** no banco: são recalculados a partir do histórico
 toda vez. Por isso nunca dessincroniza — e corrigir uma partida antiga arruma sozinho
 tudo o que veio depois.
+
+---
+
+## Modo Mesa — o tablet ao lado da mesa
+
+Aba **🎱 Mesa**, só para você. Feita para ficar aberta num celular ou tablet apoiado na
+mesa de sinuca, com botões grandes.
+
+Os jogos aparecem em dois grupos: **Rolando agora** e **Na fila**, sempre de baixo para
+cima no ladder. Em cada um:
+
+1. **▶ Começar a partida** — marca a hora e o cronômetro começa a correr. Passando de
+   15 minutos, ele muda de cor.
+2. Quando acabar, toque **no nome de quem venceu** (ou em *Deu empate*). Aparece uma
+   confirmação com o placar e a duração; confirmou, o rating e o ladder se atualizam e as
+   apostas são pagas.
+3. Apertou o start sem querer? **Zerar cronômetro** devolve o jogo para a fila.
+
+A duração fica gravada e aparece no histórico da aba Jogos como ⏱ 7:42.
+
+Tem uma caixinha **Manter a tela acesa** para o tablet não apagar durante a noite.
+Depende do navegador — onde não funciona, ela aparece desligada.
+
+### Cancelar um jogo
+
+Botão **Cancelar jogo** em cada mesa — e também na aba Jogos e na ADM. Você pode cancelar
+qualquer jogo marcado, mesmo com apostas na mesa e mesmo já iniciado: as moedas voltam
+inteiras para quem apostou e ninguém ganha nem perde rating. Dá para escrever o motivo,
+que fica na auditoria.
+
+Isso é privilégio seu. O jogador só consegue cancelar o próprio desafio, e ainda assim
+apenas enquanto ninguém tiver apostado nele.
 
 ---
 
@@ -207,6 +243,11 @@ de cada degrau.
 
 **🎲 Gerar outra** monta uma noite diferente com o mesmo modo. Se a tabela sair idêntica,
 o app tenta outras combinações até achar uma que mude de verdade.
+
+**Abrir tudo de uma vez.** Não precisa encerrar um jogo para liberar o próximo: você abre
+todas as mesas juntas e, na hora de lançar os resultados, usa o botão **Salvar todos os
+preenchidos** — ele lança só os jogos em que você escolheu o vencedor e ignora o resto.
+A ordem dos jogos é sempre de baixo para cima, tanto na tabela quanto nas listas do app.
 
 Cada confronto vem com a etiqueta (desafio ou amistoso), as duas odds, a diferença de
 rating e quantas vezes aqueles dois já se enfrentaram. Os jogos que envolvem o cinturão
